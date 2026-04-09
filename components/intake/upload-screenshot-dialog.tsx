@@ -45,12 +45,13 @@ import { isSupabaseConfigured } from "@/lib/env";
 import {
   buildPerformanceNotes,
   classificationLabel,
-  classifyImageMock,
+  classifyScreenshotAfterOcr,
   isLowConfidenceClassification,
   isRevenuePreFillOk,
   type ClassificationResult,
   type ImageClassification,
 } from "@/lib/services/screenshot-intake";
+import { extractTextFromImage } from "@/lib/services/screenshot-ocr";
 import { createClient } from "@/lib/supabase/client";
 import type { DistributionPlatform, Project } from "@/types/momentum";
 
@@ -159,10 +160,21 @@ export function UploadScreenshotDialog({ projects }: Props) {
   async function runClassification() {
     if (!file) return;
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 700));
-    setClassification(classifyImageMock(file));
-    setProcessing(false);
-    setStep("review");
+    try {
+      let extractedText = "";
+      try {
+        extractedText = await extractTextFromImage(file);
+      } catch (e) {
+        console.error(e);
+        toast.message("Couldn’t read all text from this image", {
+          description: "We’ll still classify from filename and layout.",
+        });
+      }
+      setClassification(classifyScreenshotAfterOcr(extractedText, file));
+      setStep("review");
+    } finally {
+      setProcessing(false);
+    }
   }
 
   function startForm(kind: FormKind) {
@@ -176,7 +188,7 @@ export function UploadScreenshotDialog({ projects }: Props) {
       case "revenue":
         if (sig && isRevenuePreFillOk(sig)) {
           setRevenueAmount(String(sig.revenue));
-          setRevenueSource(sig.platform ? "analytics" : "");
+          setRevenueSource("");
         } else {
           setRevenueAmount("");
           setRevenueSource("");
@@ -553,15 +565,25 @@ export function UploadScreenshotDialog({ projects }: Props) {
 
   const uncertain = classification && isLowConfidenceClassification(classification);
   const showRevenueHint =
-    classification?.classification === "analytics" &&
+    classification?.classification === "analytics_financial" &&
     !isRevenuePreFillOk(classification.signals);
+
+  const uploadProjectLabel = useMemo(() => {
+    const p = projects.find((x) => x.id === projectId);
+    return p ? projectDisplayName(p) : null;
+  }, [projects, projectId]);
+
+  const formProjectLabel = useMemo(() => {
+    const p = projects.find((x) => x.id === formProjectId);
+    return p ? projectDisplayName(p) : null;
+  }, [projects, formProjectId]);
 
   function renderActionButtons(c: ImageClassification) {
     const btn =
       "flex w-full items-start gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left text-[13px] transition-colors hover:border-zinc-300 hover:bg-zinc-50";
     const sub = "mt-0.5 block text-[12px] font-normal text-zinc-500";
 
-    if (c === "analytics") {
+    if (c === "analytics_financial") {
       return (
         <div className="grid gap-2">
           <button type="button" className={btn} onClick={() => startForm("revenue")}>
@@ -590,6 +612,40 @@ export function UploadScreenshotDialog({ projects }: Props) {
             <span>
               <span className="font-semibold text-zinc-900">Attach to distribution</span>
               <span className={sub}>You&apos;ll paste the post URL — we don&apos;t invent links.</span>
+            </span>
+          </button>
+        </div>
+      );
+    }
+    if (c === "analytics_distribution") {
+      return (
+        <div className="grid gap-2">
+          <button type="button" className={btn} onClick={() => startForm("performance_metrics")}>
+            <BarChart3 className="mt-0.5 size-4 shrink-0 text-sky-700" />
+            <span>
+              <span className="font-semibold text-zinc-900">Log performance metrics</span>
+              <span className={sub}>Save as a timeline snapshot with detected metrics in the notes.</span>
+            </span>
+          </button>
+          <button type="button" className={btn} onClick={() => startForm("distribution")}>
+            <Link2 className="mt-0.5 size-4 shrink-0 text-violet-800" />
+            <span>
+              <span className="font-semibold text-zinc-900">Attach to distribution</span>
+              <span className={sub}>You&apos;ll paste the post URL — we don&apos;t invent links.</span>
+            </span>
+          </button>
+          <button type="button" className={btn} onClick={() => startForm("revenue")}>
+            <DollarSign className="mt-0.5 size-4 shrink-0 text-emerald-700" />
+            <span>
+              <span className="font-semibold text-zinc-900">Log as revenue</span>
+              <span className={sub}>If this screen also includes revenue, confirm the amount.</span>
+            </span>
+          </button>
+          <button type="button" className={btn} onClick={() => startForm("insight")}>
+            <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-800" />
+            <span>
+              <span className="font-semibold text-zinc-900">Save as insight</span>
+              <span className={sub}>A short reflection tied to this image.</span>
             </span>
           </button>
         </div>
@@ -719,7 +775,9 @@ export function UploadScreenshotDialog({ projects }: Props) {
                   <Label className="text-[13px] font-medium">Project</Label>
                   <Select value={projectId} onValueChange={(v) => setProjectId(v ?? projectId)}>
                     <SelectTrigger className="rounded-xl border-zinc-200">
-                      <SelectValue placeholder="Choose project" />
+                      <SelectValue placeholder="Choose project">
+                        {uploadProjectLabel ?? "Choose project"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {projects.map((p) => (
@@ -768,7 +826,7 @@ export function UploadScreenshotDialog({ projects }: Props) {
                 {processing ? (
                   <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-[13px] text-zinc-700">
                     <Loader2 className="size-4 animate-spin text-zinc-500" />
-                    Classifying image…
+                    Reading text and classifying…
                   </div>
                 ) : (
                   <div className="flex justify-end pt-1">
@@ -799,6 +857,17 @@ export function UploadScreenshotDialog({ projects }: Props) {
                     </span>
                   </div>
                   <p className="mt-2 text-[13px] leading-relaxed text-zinc-600">{classification.summary}</p>
+
+                  <div className="mt-3 rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                      Extracted text (OCR)
+                    </p>
+                    <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap break-words text-[12px] leading-snug text-zinc-700">
+                      {classification.extractedText.trim()
+                        ? classification.extractedText.trim()
+                        : "No readable text detected — classification used layout and filename hints."}
+                    </p>
+                  </div>
 
                   {uncertain ? (
                     <p className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-2 text-[13px] leading-relaxed text-amber-950">
@@ -855,7 +924,9 @@ export function UploadScreenshotDialog({ projects }: Props) {
                       <Label>Project</Label>
                       <Select value={formProjectId} onValueChange={(v) => setFormProjectId(v ?? formProjectId)}>
                         <SelectTrigger className="rounded-xl">
-                          <SelectValue />
+                          <SelectValue placeholder="Choose project">
+                            {formProjectLabel ?? "Choose project"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {projects.map((p) => (
@@ -882,7 +953,9 @@ export function UploadScreenshotDialog({ projects }: Props) {
                     <Label>Project</Label>
                     <Select value={formProjectId} onValueChange={(v) => setFormProjectId(v ?? formProjectId)}>
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue />
+                        <SelectValue placeholder="Choose project">
+                          {formProjectLabel ?? "Choose project"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {projects.map((p) => (

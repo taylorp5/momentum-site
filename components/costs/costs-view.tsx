@@ -10,6 +10,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
+import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -296,6 +297,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                   <TableHead className="min-w-[240px]">Expense</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[120px]">Type</TableHead>
+                  <TableHead className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -354,6 +356,17 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                           ) : null;
                         })()}
                       </div>
+                    </TableCell>
+                    <TableCell
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DeleteTimelineEntryDialog
+                        entryId={row.id}
+                        projectId={row.project_id}
+                        previewTitle={`${money.format(row.amount)} — ${row.category ?? "Expense"}`}
+                        onDeleted={() => router.refresh()}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,8 +1,9 @@
 import type { DistributionPlatform } from "@/types/momentum";
 
-/** Result of image classification (mock / future vision API). */
+/** Result of image classification after OCR + rules (visual fallback is last resort). */
 export type ImageClassification =
-  | "analytics"
+  | "analytics_financial"
+  | "analytics_distribution"
   | "content_asset"
   | "document"
   | "unknown";
@@ -30,21 +31,47 @@ export type ClassificationResult = {
   classification: ImageClassification;
   /** 0–1; use with `isLowConfidenceClassification`. */
   confidence: number;
-  /** Short label, e.g. "Analytics dashboard" */
+  /** Short label for the review chip */
   title: string;
   /** One-line explanation for the review screen. */
   summary: string;
   signals: ClassificationSignals;
+  /** Full OCR output (may be empty if OCR failed or image has no text). */
+  extractedText: string;
 };
+
+const FINANCIAL_KEYWORDS = [
+  "revenue",
+  "mrr",
+  "arr",
+  "subscription",
+  "billing",
+  "customers",
+  "stripe",
+  "income",
+] as const;
+
+const PERFORMANCE_KEYWORDS = [
+  "views",
+  "likes",
+  "comments",
+  "impressions",
+  "engagement",
+] as const;
 
 const CLASS_COPY: Record<
   ImageClassification,
-  { title: string; summary: (c: number) => string }
+  { title: string; summary: () => string }
 > = {
-  analytics: {
-    title: "Analytics",
+  analytics_financial: {
+    title: "Analytics (Financial)",
     summary: () =>
-      "Looks like charts, metrics, or a dashboard — we may be able to pull numbers for you to confirm.",
+      "Text in the image points to revenue, billing, or money metrics — confirm amounts before saving.",
+  },
+  analytics_distribution: {
+    title: "Analytics (Performance)",
+    summary: () =>
+      "Text suggests reach or engagement — useful for a performance snapshot or distribution context.",
   },
   content_asset: {
     title: "Content / design",
@@ -59,7 +86,7 @@ const CLASS_COPY: Record<
   unknown: {
     title: "Unclear",
     summary: () =>
-      "We’re not sure what this is — pick how you’d like to save it.",
+      "We're not sure what this is — pick how you'd like to save it.",
   },
 };
 
@@ -69,47 +96,146 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
+/** Enough text for keyword rules to be trustworthy. */
+export function isMeaningfulExtractedText(text: string): boolean {
+  const s = text.replace(/\s+/g, " ").trim();
+  if (s.length < 12) return false;
+  const words = s.split(/\s+/).filter(Boolean);
+  return words.length >= 2;
+}
+
+export function countKeywordHits(text: string, keywords: readonly string[]): number {
+  const lower = text.toLowerCase();
+  let n = 0;
+  for (const kw of keywords) {
+    if (lower.includes(kw.toLowerCase())) n += 1;
+  }
+  return n;
+}
+
+/** First USD-like amount in the string (OCR — user must still confirm). */
+function extractFirstDollarAmount(text: string): number | undefined {
+  const m = text.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/);
+  if (!m) return undefined;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+function extractCustomerCount(text: string): number | undefined {
+  const m = text.match(/([\d,]+)\s+customers?\b/i);
+  if (!m) return undefined;
+  const n = parseInt(m[1].replace(/,/g, ""), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function extractCountBeforeWord(text: string, word: string): number | undefined {
+  const re = new RegExp(`([\\d,]+)\\s+${word}\\b`, "i");
+  const m = text.match(re);
+  if (!m) return undefined;
+  const n = parseInt(m[1].replace(/,/g, ""), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Pull numbers from performance-related phrases. */
+function extractPerformanceStructuredSignals(text: string): ClassificationSignals {
+  const s: ClassificationSignals = {};
+  const views = extractCountBeforeWord(text, "views?");
+  if (views != null) s.views = views;
+  const likes = extractCountBeforeWord(text, "likes?");
+  if (likes != null) s.likes = likes;
+  const comments = extractCountBeforeWord(text, "comments?");
+  if (comments != null) s.comments = comments;
+  const im = text.match(/([\d,]+)\s+impressions?\b/i);
+  if (im) {
+    const n = parseInt(im[1].replace(/,/g, ""), 10);
+    if (Number.isFinite(n)) s.views = s.views ?? n;
+  }
+  const parts: string[] = [];
+  if (s.views != null) parts.push(`Views ${s.views}`);
+  if (s.likes != null) parts.push(`Likes ${s.likes}`);
+  if (s.comments != null) parts.push(`Comments ${s.comments}`);
+  if (parts.length > 0) s.metricsSummary = parts.join(" · ");
+  return s;
+}
+
+/** Financial + optional embedded performance numbers. */
+function extractFinancialStructuredSignals(text: string): ClassificationSignals {
+  const perf = extractPerformanceStructuredSignals(text);
+  const customers = extractCustomerCount(text);
+  const revenue = extractFirstDollarAmount(text);
+  const next: ClassificationSignals = { ...perf };
+  if (customers != null) next.customers = customers;
+  if (revenue != null) {
+    next.revenue = revenue;
+    next.revenueConfidenceOk = true;
+  }
+  return next;
+}
+
 /**
- * Deterministic mock classifier. Replace with vision / OCR pipeline later.
- * Filename hints nudge the class; otherwise bucket by file fingerprint.
+ * Primary classifier: OCR text drives keyword buckets; visual/heuristic only if
+ * there is no meaningful text or no keyword hits.
  */
-export function classifyImageMock(file: File): ClassificationResult {
+export function classifyScreenshotAfterOcr(
+  extractedTextRaw: string,
+  file: File
+): ClassificationResult {
+  const extractedText = extractedTextRaw.trim();
+
+  if (isMeaningfulExtractedText(extractedText)) {
+    const financialHits = countKeywordHits(extractedText, FINANCIAL_KEYWORDS);
+    const performanceHits = countKeywordHits(extractedText, PERFORMANCE_KEYWORDS);
+
+    if (financialHits > 0) {
+      const confidence = financialHits >= 2 ? 0.92 : 0.78;
+      return {
+        classification: "analytics_financial",
+        confidence,
+        title: CLASS_COPY.analytics_financial.title,
+        summary: CLASS_COPY.analytics_financial.summary(),
+        signals: extractFinancialStructuredSignals(extractedText),
+        extractedText,
+      };
+    }
+
+    if (performanceHits > 0) {
+      const confidence = performanceHits >= 2 ? 0.9 : 0.76;
+      return {
+        classification: "analytics_distribution",
+        confidence,
+        title: CLASS_COPY.analytics_distribution.title,
+        summary: CLASS_COPY.analytics_distribution.summary(),
+        signals: extractPerformanceStructuredSignals(extractedText),
+        extractedText,
+      };
+    }
+  }
+
+  const visual = classifyImageVisualFallback(file, extractedText);
+  return { ...visual, extractedText };
+}
+
+/**
+ * Last-resort classifier (filename hints + fingerprint). Does not override
+ * keyword-based analytics — only used when OCR had nothing useful or no keywords matched.
+ */
+function classifyImageVisualFallback(
+  file: File,
+  extractedText: string
+): Omit<ClassificationResult, "extractedText"> {
   const name = file.name.toLowerCase();
-  const hintAnalytics =
-    /chart|metric|analytics|revenue|dashboard|stats|kpi|graph|insight|report|stripe|paddle|mrr/.test(
-      name
-    );
   const hintContent =
     /logo|brand|icon|ui|design|screen|mock|figma|hero|banner|asset/.test(name);
   const hintDoc =
     /doc|text|email|letter|pdf|note|contract|slack|notion|readme/.test(name);
 
   let bucket = hashString(`${file.name}:${file.size}`) % 5;
-  if (hintAnalytics) bucket = 0;
-  else if (hintContent) bucket = 1;
+  if (hintContent) bucket = 1;
   else if (hintDoc) bucket = 2;
   else if (bucket === 4) bucket = 3;
 
-  if (bucket === 0) {
-    const confidence = hintAnalytics ? 0.86 : 0.74;
-    return {
-      classification: "analytics",
-      confidence,
-      title: CLASS_COPY.analytics.title,
-      summary: CLASS_COPY.analytics.summary(confidence),
-      signals: {
-        revenue: 56,
-        revenueConfidenceOk: confidence >= 0.72,
-        views: 1280,
-        likes: 42,
-        comments: 7,
-        metricsSummary: "CTR 2.4% · Sessions 3.1k",
-        timeRangeLabel: "Last 28 days",
-        customers: 52,
-        platform: "other",
-      },
-    };
-  }
+  const ocrLooksTextHeavy =
+    extractedText.length > 80 && /\w{4,}/.test(extractedText);
 
   if (bucket === 1) {
     const confidence = hintContent ? 0.84 : 0.7;
@@ -117,21 +243,22 @@ export function classifyImageMock(file: File): ClassificationResult {
       classification: "content_asset",
       confidence,
       title: CLASS_COPY.content_asset.title,
-      summary: CLASS_COPY.content_asset.summary(confidence),
+      summary: CLASS_COPY.content_asset.summary(),
       signals: {
         likelyLogo: true,
         likelyUi: true,
         likelyProductVisual: confidence > 0.75,
+        textHeavy: ocrLooksTextHeavy,
       },
     };
   }
 
-  if (bucket === 2) {
+  if (bucket === 2 || ocrLooksTextHeavy) {
     return {
       classification: "document",
-      confidence: hintDoc ? 0.78 : 0.68,
+      confidence: hintDoc ? 0.78 : ocrLooksTextHeavy ? 0.72 : 0.68,
       title: CLASS_COPY.document.title,
-      summary: CLASS_COPY.document.summary(0.78),
+      summary: CLASS_COPY.document.summary(),
       signals: {
         textHeavy: true,
       },
@@ -142,7 +269,7 @@ export function classifyImageMock(file: File): ClassificationResult {
     classification: "unknown",
     confidence: 0.41,
     title: CLASS_COPY.unknown.title,
-    summary: CLASS_COPY.unknown.summary(0.41),
+    summary: CLASS_COPY.unknown.summary(),
     signals: {},
   };
 }
@@ -175,8 +302,10 @@ export function buildPerformanceNotes(s: ClassificationSignals): string {
 
 export function classificationLabel(c: ImageClassification): string {
   switch (c) {
-    case "analytics":
-      return "Analytics";
+    case "analytics_financial":
+      return "Analytics (Financial)";
+    case "analytics_distribution":
+      return "Analytics (Performance)";
     case "content_asset":
       return "Content asset";
     case "document":

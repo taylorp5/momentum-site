@@ -16,6 +16,7 @@ import {
 import { ProAnalyticsGate } from "@/components/billing/pro-analytics-gate";
 import { usePlan } from "@/components/billing/plan-context";
 import { EditRevenueDialog } from "@/components/financials/edit-revenue-dialog";
+import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
 import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import {
   dashCard,
@@ -737,7 +738,7 @@ export function FinancialIntelligenceView({
                   <TableHead className="w-[110px]">Type</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead className="min-w-[160px]">Notes</TableHead>
-                  <TableHead className="w-[100px] text-right"> </TableHead>
+                  <TableHead className="w-[180px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -775,16 +776,24 @@ export function FinancialIntelligenceView({
                       {row.description?.trim() || "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1 text-[12px] text-zinc-700"
-                        onClick={() => setEditRevenueEntry(row)}
-                      >
-                        <Pencil className="size-3.5" strokeWidth={1.75} />
-                        Edit
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        <DeleteTimelineEntryDialog
+                          entryId={row.id}
+                          projectId={row.project_id}
+                          previewTitle={`${money.format(row.amount)} revenue${row.revenue_source ? ` — ${row.revenue_source}` : ""}`}
+                          onDeleted={() => router.refresh()}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1 text-[12px] text-zinc-700"
+                          onClick={() => setEditRevenueEntry(row)}
+                        >
+                          <Pencil className="size-3.5" strokeWidth={1.75} />
+                          Edit
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
