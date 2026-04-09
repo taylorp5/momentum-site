@@ -355,7 +355,6 @@ export function ProjectDetailClient({
           <WorkSessionCard
             projectId={project.id}
             projectName={project.name}
-            isPro={isPro}
             todaySeconds={workSessions.todaySeconds}
             weekSeconds={workSessions.weekSeconds}
             activeSession={workSessions.activeSession}

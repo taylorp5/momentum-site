@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { usePlan } from "@/components/billing/plan-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Project } from "@/types/momentum";
@@ -63,6 +64,7 @@ export function DashboardHeader({
   leading,
 }: DashboardHeaderProps) {
   const router = useRouter();
+  const { isPro, openUpgrade } = usePlan();
   const pathname = usePathname();
   const onFocusPage = pathname === "/focus";
   const [startOpen, setStartOpen] = useState(false);
@@ -151,6 +153,14 @@ export function DashboardHeader({
     "";
 
   async function onStartSession() {
+    if (!isPro) {
+      toast.message("Timed work sessions are a Pro feature", {
+        description: "Upgrade to start and track build sessions.",
+      });
+      openUpgrade();
+      setStartOpen(false);
+      return;
+    }
     if (!sessionProjectId) {
       toast.error("Choose a project to start a build session.");
       return;
@@ -245,13 +255,24 @@ export function DashboardHeader({
             size="sm"
             className="h-8 gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold"
             disabled={projects.length === 0 || Boolean(runningSession)}
-            onClick={() => setStartOpen(true)}
+            onClick={() => {
+              if (!isPro && !runningSession) {
+                toast.message("Timed work sessions are a Pro feature", {
+                  description: "Upgrade to start and track build sessions.",
+                });
+                openUpgrade();
+                return;
+              }
+              setStartOpen(true);
+            }}
             title={
               projects.length === 0
                 ? "Create a project first."
                 : runningSession
                   ? "End current session before starting another."
-                  : undefined
+                  : !isPro
+                    ? "Upgrade to Pro to use timed work sessions."
+                    : undefined
             }
           >
             <Timer className="size-3.5" strokeWidth={1.75} />

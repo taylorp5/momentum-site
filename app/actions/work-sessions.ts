@@ -8,8 +8,9 @@ import {
   SUPABASE_REQUIRED_ERROR,
   validationError,
 } from "@/lib/actions/result";
-import { requireSessionUser } from "@/lib/auth/user";
+import { getProfile, requireSessionUser } from "@/lib/auth/user";
 import { isMockDataMode, isSupabaseConfigured } from "@/lib/env";
+import { isProPlan } from "@/lib/plan";
 import { createClient } from "@/lib/supabase/server";
 import { insertTimelineEntry } from "@/lib/services/timeline-entries";
 
@@ -53,6 +54,17 @@ async function requireWritable() {
   return { user, error: null as string | null };
 }
 
+const PRO_TIMED_SESSION_ERROR =
+  "Timed work sessions are a Pro feature. Upgrade to unlock them.";
+
+async function requireProForTimedWork(userId: string): Promise<ActionResult | null> {
+  const profile = await getProfile(userId);
+  if (!isProPlan(profile?.plan ?? "free")) {
+    return { error: PRO_TIMED_SESSION_ERROR };
+  }
+  return null;
+}
+
 export async function startWorkSessionAction(projectId: string): Promise<ActionResult> {
   const parsed = uuidSchema.safeParse(projectId);
   if (!parsed.success) return validationError(parsed.error);
@@ -64,6 +76,9 @@ export async function startWorkSessionAction(projectId: string): Promise<ActionR
     return { error: "Another project has a running session. Stop or switch first." };
   }
   if (running && running.project_id === projectId) return { success: true };
+
+  const proErr = await requireProForTimedWork(user.id);
+  if (proErr) return proErr;
 
   const now = new Date().toISOString();
   const { error: insertError } = await supabase.from("work_sessions").insert({
@@ -217,6 +232,8 @@ export async function switchWorkSessionAction(nextProjectId: string): Promise<Ac
   if (!parsed.success) return validationError(parsed.error);
   const { user, error } = await requireWritable();
   if (error) return { error };
+  const proErr = await requireProForTimedWork(user.id);
+  if (proErr) return proErr;
   const running = await getRunningSession(user.id);
   if (running) {
     await stopWorkSessionAction({
@@ -240,6 +257,8 @@ export async function logManualWorkSessionAction(input: unknown): Promise<Action
   if (!parsed.success) return validationError(parsed.error);
   const { user, error } = await requireWritable();
   if (error) return { error };
+  const proErr = await requireProForTimedWork(user.id);
+  if (proErr) return proErr;
   const { projectId, date, durationSeconds, note } = parsed.data;
   const supabase = await createClient();
   const start = new Date(`${date}T09:00:00.000Z`);

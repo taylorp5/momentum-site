@@ -25,7 +25,6 @@ import type { WorkSession } from "@/types/momentum";
 type Props = {
   projectId: string;
   projectName: string;
-  isPro: boolean;
   todaySeconds: number;
   weekSeconds: number;
   activeSession: WorkSession | null;
@@ -83,7 +82,6 @@ function sanitizeWholeMinutesInput(raw: string): string {
 export function WorkSessionCard({
   projectId,
   projectName,
-  isPro,
   todaySeconds,
   weekSeconds,
   activeSession,
@@ -91,7 +89,7 @@ export function WorkSessionCard({
   recentCompleted,
 }: Props) {
   const router = useRouter();
-  const { openUpgrade } = usePlan();
+  const { isPro, openUpgrade } = usePlan();
   const [pending, setPending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [manualOpen, setManualOpen] = useState(false);
@@ -157,11 +155,19 @@ export function WorkSessionCard({
         <CardHeader className="pb-3">
           <CardTitle className="text-[15px] font-semibold tracking-tight">Work session</CardTitle>
           <p className="text-[13px] text-zinc-600">
-            Track work sessions and see how much time you actually invest in each project.
+            Start a live timer, pause, and log time to your timeline — Pro only.
           </p>
         </CardHeader>
-        <CardContent className="pb-4">
-          <Button className="h-9 rounded-lg" onClick={openUpgrade}>
+        <CardContent className="space-y-3 pb-4">
+          <Button
+            className="h-9 rounded-lg bg-zinc-900 hover:bg-zinc-800"
+            onClick={() => {
+              toast.message("Timed work sessions are a Pro feature", {
+                description: "Upgrade to unlock the timer and manual time logging.",
+              });
+              openUpgrade();
+            }}
+          >
             Upgrade to Pro
           </Button>
         </CardContent>
