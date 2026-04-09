@@ -213,6 +213,9 @@ type OpenFollowUpButtonProps = {
   onOpen: () => void;
 };
 
+/** Temporary: disable until the flow is ready (tooltip on wrapper — disabled buttons don’t always show title). */
+const FOLLOW_UP_BUTTON_COMING_SOON = true;
+
 /** Opens the parent-owned follow-up flow (single modal per surface). */
 export function OpenDistributionFollowUpButton({
   disabled = false,
@@ -220,18 +223,22 @@ export function OpenDistributionFollowUpButton({
   className,
   onOpen,
 }: OpenFollowUpButtonProps) {
-  return (
+  const mergedDisabled = FOLLOW_UP_BUTTON_COMING_SOON || disabled;
+  const button = (
     <Button
       type="button"
       variant="outline"
       size="sm"
       className={cn(
         "h-8 gap-1 rounded-lg px-2.5 text-[11px] font-semibold",
+        FOLLOW_UP_BUTTON_COMING_SOON &&
+          "cursor-not-allowed border-zinc-200/90 bg-zinc-100/80 text-zinc-400 opacity-70 shadow-none hover:bg-zinc-100/80",
         className
       )}
-      disabled={disabled}
-      title="Generate follow-up post ideas"
+      disabled={mergedDisabled}
+      title={FOLLOW_UP_BUTTON_COMING_SOON ? undefined : "Generate follow-up post ideas"}
       onClick={(e) => {
+        if (mergedDisabled) return;
         if (stopRowClick) {
           e.preventDefault();
           e.stopPropagation();
@@ -243,4 +250,13 @@ export function OpenDistributionFollowUpButton({
       Generate follow-up
     </Button>
   );
+
+  if (FOLLOW_UP_BUTTON_COMING_SOON) {
+    return (
+      <span title="Coming soon" className="inline-flex max-w-full">
+        {button}
+      </span>
+    );
+  }
+  return button;
 }

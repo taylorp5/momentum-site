@@ -3,6 +3,27 @@ import { isMockDataMode, isSupabaseConfigured } from "@/lib/env";
 import { mockContentGroups } from "@/lib/mock-data";
 import type { ContentGroup } from "@/types/momentum";
 
+export async function getContentGroupByIdForUser(
+  userId: string,
+  groupId: string
+): Promise<ContentGroup | null> {
+  if (isMockDataMode()) {
+    return mockContentGroups.find((g) => g.user_id === userId && g.id === groupId) ?? null;
+  }
+  if (!isSupabaseConfigured()) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("content_groups")
+    .select("id, user_id, title, description, created_at, updated_at")
+    .eq("user_id", userId)
+    .eq("id", groupId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as ContentGroup) ?? null;
+}
+
 export async function listContentGroupsForUser(userId: string): Promise<ContentGroup[]> {
   if (isMockDataMode()) {
     return mockContentGroups.filter((g) => g.user_id === userId);

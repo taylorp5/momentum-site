@@ -18,6 +18,8 @@ import { listDistributionForProject } from "@/lib/data/distribution";
 import { getProject } from "@/lib/data/projects";
 import { parseDistributionMetrics } from "@/lib/distribution-metrics";
 import { extractDistributionMetricsFromImage } from "@/lib/services/distribution-attachment-extractor";
+import { insertTimelineEntry } from "@/lib/services/timeline-entries";
+import type { LogEventInput } from "@/lib/validations/timeline";
 import { createClient } from "@/lib/supabase/server";
 import type {
   DistributionAttachment,
@@ -167,6 +169,243 @@ export async function deleteDistributionEntryAction(
   if (error) return { error: error.message };
 
   revalidateDistributionSurfaces(parsed.data.project_id);
+  return { success: true };
+}
+
+function normalizeDistributionSubreddit(
+  platform: DistributionPlatform,
+  raw: string | null | undefined
+): string | null {
+  if (platform !== "reddit") return null;
+  const s = raw?.trim();
+  if (!s) return null;
+  return s.replace(/^r\//i, "").replace(/^\//, "").slice(0, 120) || null;
+}
+
+function buildDistributionRowDescription(
+  globalNotes: string,
+  platformNotes: string,
+  storage: "grouped" | "combined"
+): string {
+  const g = globalNotes.trim();
+  const p = platformNotes.trim();
+  if (storage === "grouped") return p;
+  return [g, p].filter(Boolean).join("\n\n");
+}
+
+async function deleteContentGroupIfOrphaned(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  groupId: string
+) {
+  const { count, error } = await supabase
+    .from("timeline_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("content_group_id", groupId);
+  if (error) return;
+  if ((count ?? 0) === 0) {
+    await supabase.from("content_groups").delete().eq("id", groupId).eq("user_id", userId);
+  }
+}
+
+const saveDistributionBundlePlatformSchema = z
+  .object({
+    timeline_id: z.string().uuid().optional(),
+    platform: z.enum([
+      "reddit",
+      "tiktok",
+      "twitter",
+      "product_hunt",
+      "instagram",
+      "youtube",
+      "other",
+    ]),
+    entry_date: z.string().min(1),
+    subreddit: z.string().max(120).nullable().optional(),
+    url: z.string().url(),
+    notes: z.string().max(5000).optional().default(""),
+    metrics: updateDistributionEntrySchema.shape.metrics.optional().nullable(),
+  })
+  .strict();
+
+const saveDistributionBundleSchema = z
+  .object({
+    project_id: z.string().uuid(),
+    content_title: z.string().max(200).optional().nullable(),
+    global_notes: z.string().max(5000).optional().default(""),
+    existing_content_group_id: z.string().uuid().nullable().optional(),
+    platforms: z.array(saveDistributionBundlePlatformSchema).min(1),
+    deleted_timeline_ids: z.array(z.string().uuid()).default([]),
+  })
+  .strict();
+
+/** Create/update/delete distribution timeline rows as one content + platform entries. */
+export async function saveDistributionBundleAction(
+  input: unknown
+): Promise<ActionResult> {
+  const user = await requireSessionUser();
+  if (isMockDataMode()) return { error: READ_ONLY_MOCK_ERROR };
+  if (!isSupabaseConfigured()) return { error: SUPABASE_REQUIRED_ERROR };
+
+  const parsed = saveDistributionBundleSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const supabase = await createClient();
+  const profile = await getProfile(user.id);
+  const pro = isProPlan(profile?.plan ?? "free");
+
+  const {
+    project_id,
+    content_title,
+    global_notes,
+    existing_content_group_id,
+    platforms,
+    deleted_timeline_ids,
+  } = parsed.data;
+
+  const titleStr = content_title?.trim() || "Distribution post";
+  const oldGroupId = existing_content_group_id ?? null;
+
+  const proj = await getProject(project_id, user.id);
+  if (!proj) return { error: "Invalid project." };
+
+  const activeTimelineIds = new Set<string>();
+  for (const p of platforms) {
+    if (p.timeline_id) activeTimelineIds.add(p.timeline_id);
+  }
+  for (const id of deleted_timeline_ids) {
+    if (activeTimelineIds.has(id)) {
+      return { error: "Invalid save: a removed row is still listed as active." };
+    }
+  }
+
+  const idsToVerify = [...activeTimelineIds, ...deleted_timeline_ids];
+  if (idsToVerify.length > 0) {
+    const { data: foundRows, error: qErr } = await supabase
+      .from("timeline_entries")
+      .select("id, project_id")
+      .eq("user_id", user.id)
+      .eq("type", "distribution")
+      .in("id", idsToVerify);
+    if (qErr) return { error: qErr.message };
+    const byId = new Map((foundRows ?? []).map((r) => [r.id as string, r]));
+    for (const id of idsToVerify) {
+      const r = byId.get(id);
+      if (!r || r.project_id !== project_id) {
+        return { error: "Invalid distribution entry." };
+      }
+    }
+  }
+
+  const n = platforms.length;
+  let groupId: string | null = null;
+  let storage: "grouped" | "combined" = "combined";
+
+  if (n > 1 && pro) {
+    storage = "grouped";
+    if (oldGroupId) {
+      const { data: own, error: ownErr } = await supabase
+        .from("content_groups")
+        .select("id")
+        .eq("id", oldGroupId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (ownErr) return { error: ownErr.message };
+      if (!own) return { error: "Invalid content group." };
+      groupId = oldGroupId;
+      const { error: upG } = await supabase
+        .from("content_groups")
+        .update({
+          title: titleStr.slice(0, 200),
+          description: global_notes.trim() || null,
+        })
+        .eq("id", groupId)
+        .eq("user_id", user.id);
+      if (upG) return { error: upG.message };
+    } else {
+      const { data: row, error: cgErr } = await supabase
+        .from("content_groups")
+        .insert({
+          user_id: user.id,
+          title: titleStr.slice(0, 200),
+          description: global_notes.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (cgErr) return { error: cgErr.message };
+      groupId = row.id as string;
+    }
+  } else {
+    storage = "combined";
+    groupId = null;
+  }
+
+  for (const id of deleted_timeline_ids) {
+    const { error: delErr } = await supabase
+      .from("timeline_entries")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .eq("type", "distribution");
+    if (delErr) return { error: delErr.message };
+  }
+
+  for (const p of platforms) {
+    const sub = normalizeDistributionSubreddit(p.platform, p.subreddit);
+    const desc = buildDistributionRowDescription(
+      global_notes,
+      p.notes,
+      storage
+    );
+    const metricsJson = p.metrics ?? null;
+
+    if (p.timeline_id) {
+      const { error: upErr } = await supabase
+        .from("timeline_entries")
+        .update({
+          project_id,
+          platform: p.platform,
+          title: titleStr,
+          description: desc,
+          external_url: p.url.trim() || null,
+          entry_date: p.entry_date,
+          metrics: metricsJson,
+          subreddit: sub,
+          content_group_id: groupId,
+        })
+        .eq("id", p.timeline_id)
+        .eq("user_id", user.id)
+        .eq("type", "distribution");
+      if (upErr) return { error: upErr.message };
+    } else {
+      const { error: insErr } = await insertTimelineEntry(supabase, {
+        userId: user.id,
+        data: {
+          type: "distribution",
+          project_id,
+          entry_date: p.entry_date,
+          platform: p.platform,
+          title: titleStr,
+          notes: desc,
+          url: p.url,
+          image_storage_path: null,
+          metrics: metricsJson ?? undefined,
+          subreddit: sub,
+          content_group_id: groupId,
+          new_content_group_title: null,
+          new_content_group_description: null,
+        } as LogEventInput,
+        provenance: { source_type: "manual", source_metadata: null },
+      });
+      if (insErr) return { error: insErr.message };
+    }
+  }
+
+  if (oldGroupId && oldGroupId !== groupId) {
+    await deleteContentGroupIfOrphaned(supabase, user.id, oldGroupId);
+  }
+
+  revalidateDistributionSurfaces(project_id);
   return { success: true };
 }
 

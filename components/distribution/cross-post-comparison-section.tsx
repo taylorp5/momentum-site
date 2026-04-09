@@ -73,19 +73,19 @@ export function CrossPostComparisonSection({
   if (comparisons.length === 0) return null;
 
   return (
-    <section id="cross-post-comparisons" className="scroll-mt-24 space-y-4">
+    <section id="multi-platform-comparisons" className="scroll-mt-24 space-y-4">
       <div className="flex items-center gap-2 border-b border-zinc-200/80 pb-2">
         <Layers className="size-4 text-zinc-500" strokeWidth={1.65} />
-        <h2 className="text-[14px] font-semibold text-zinc-900">Cross-post comparison</h2>
+        <h2 className="text-[14px] font-semibold text-zinc-900">Multi-platform comparison</h2>
       </div>
       <p className="text-[13px] leading-relaxed text-zinc-600">
-        Same content idea across platforms and dates — see where it landed hardest (Pro).
+        One content item with multiple platform entries — see where it performed best (Pro).
       </p>
 
       <ProAnalyticsGate
         isPro={isPro}
-        overlayTitle="Compare cross-posts"
-        overlayDescription="Group the same idea across TikTok, Shorts, Reddit subs, and more — then see best platform, subreddit, and views."
+        overlayTitle="Compare platforms"
+        overlayDescription="When you log several platforms for the same content, compare TikTok, Shorts, Reddit, and more side by side."
         ctaLabel="Upgrade to Pro"
       >
         <div className="space-y-6">

@@ -327,24 +327,31 @@ type OpenRewritePostButtonProps = {
   onOpen: () => void;
 };
 
+/** Temporary: disable until the flow is ready (tooltip on wrapper — disabled buttons don’t always show title). */
+const REWRITE_BUTTON_COMING_SOON = true;
+
 export function OpenRewritePostButton({
   disabled = false,
   stopRowClick = true,
   className,
   onOpen,
 }: OpenRewritePostButtonProps) {
-  return (
+  const mergedDisabled = REWRITE_BUTTON_COMING_SOON || disabled;
+  const button = (
     <Button
       type="button"
       variant="outline"
       size="sm"
       className={cn(
         "h-8 gap-1 rounded-lg px-2.5 text-[11px] font-semibold",
+        REWRITE_BUTTON_COMING_SOON &&
+          "cursor-not-allowed border-zinc-200/90 bg-zinc-100/80 text-zinc-400 opacity-70 shadow-none hover:bg-zinc-100/80",
         className
       )}
-      disabled={disabled}
-      title="Rewrite this post with AI"
+      disabled={mergedDisabled}
+      title={REWRITE_BUTTON_COMING_SOON ? undefined : "Rewrite this post with AI"}
       onClick={(e) => {
+        if (mergedDisabled) return;
         if (stopRowClick) {
           e.preventDefault();
           e.stopPropagation();
@@ -356,4 +363,13 @@ export function OpenRewritePostButton({
       Rewrite post
     </Button>
   );
+
+  if (REWRITE_BUTTON_COMING_SOON) {
+    return (
+      <span title="Coming soon" className="inline-flex max-w-full">
+        {button}
+      </span>
+    );
+  }
+  return button;
 }

@@ -13,7 +13,10 @@ import {
   Wallet,
   WalletCards,
 } from "lucide-react";
+import { createDistributionContentGroupAction } from "@/app/actions/content-groups";
+import { saveDistributionBundleAction } from "@/app/actions/distribution";
 import { createLogEventAction } from "@/app/actions/timeline";
+import { usePlan } from "@/components/billing/plan-context";
 import {
   DISTRIBUTION_PLATFORM_LABELS,
   TIMELINE_BUCKET,
@@ -21,6 +24,10 @@ import {
   TIMELINE_SNAPSHOT_MAX_BYTES,
 } from "@/lib/constants";
 import { PLATFORM_ORDER } from "@/lib/platform-config";
+import {
+  hydrateDistributionEdit,
+  mergePlatformMetricsForSave,
+} from "@/lib/distribution-edit-hydration";
 import {
   logEventSchema,
   timelineEntryTypeSchema,
@@ -49,9 +56,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DistributionEditAttachmentsPanel } from "@/components/distribution/distribution-edit-attachments-panel";
 import { PlatformIcon } from "@/components/distribution/platform-icon";
 import { toast } from "sonner";
 import type {
+  DistributionEntry,
+  DistributionMetrics,
   DistributionPlatform,
   Project,
   TimelineEntryType,
@@ -85,6 +95,10 @@ type FormValues = {
 
 type DistributionPlatformEntry = {
   id: string;
+  /** Existing timeline row when editing */
+  timelineId?: string;
+  /** Metrics loaded from DB; merged with the views field on save */
+  persistedMetrics?: DistributionMetrics;
   platform: DistributionPlatform;
   subreddit: string;
   url: string;
@@ -399,6 +413,14 @@ type LogEventDialogProps = {
   distributionQuickMode?: boolean;
   /** First field to focus after open */
   distributionInitialFocus?: "platform" | "post_url";
+  /** Controlled edit: same form as create, backed by one or more distribution rows */
+  distributionEdit?: {
+    anchorTimelineId: string;
+    bundle: DistributionEntry[];
+    groupDescription: string | null;
+  } | null;
+  /** When true, attachment uploads are disabled (e.g. mock / demo mode). */
+  distributionAttachmentsReadOnly?: boolean;
 };
 
 export function LogEventDialog({
@@ -413,8 +435,11 @@ export function LogEventDialog({
   distributionPrefill,
   distributionQuickMode = false,
   distributionInitialFocus,
+  distributionEdit,
+  distributionAttachmentsReadOnly = false,
 }: LogEventDialogProps) {
   const router = useRouter();
+  const { isPro } = usePlan();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
@@ -427,6 +452,9 @@ export function LogEventDialog({
   const [distributionEntries, setDistributionEntries] = useState<
     DistributionPlatformEntry[]
   >([]);
+  const [editContentGroupId, setEditContentGroupId] = useState<string | null>(
+    null
+  );
   const platformTriggerRef = useRef<HTMLButtonElement | null>(null);
   const postUrlInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -460,6 +488,7 @@ export function LogEventDialog({
 
   useEffect(() => {
     if (!open) return;
+    if (distributionEdit) return;
     const pid = fixedProjectId ?? projects?.[0]?.id ?? "";
     form.setValue("project_id", pid);
     form.setValue("type", defaultEventType ?? defaultType);
@@ -468,6 +497,7 @@ export function LogEventDialog({
     }
   }, [
     open,
+    distributionEdit,
     fixedProjectId,
     projects,
     defaultType,
@@ -478,18 +508,21 @@ export function LogEventDialog({
 
   useEffect(() => {
     if (!open || defaultEventType !== "distribution") return;
+    if (distributionEdit) return;
     if (!distributionPrefill) return;
     form.setValue("title", distributionPrefill.title);
     form.setValue("description", distributionPrefill.notes);
-  }, [open, defaultEventType, distributionPrefill, form]);
+  }, [open, defaultEventType, distributionEdit, distributionPrefill, form]);
 
   const type = form.watch("type");
   const isContextLocked = defaultEventType != null;
   const effectiveType = isContextLocked ? defaultEventType! : type;
   const isDistributionFlow = effectiveType === "distribution";
-  const distQuick = Boolean(distributionQuickMode) && isDistributionFlow;
+  const isDistributionEditMode = Boolean(distributionEdit);
+  const distQuick =
+    Boolean(distributionQuickMode) && isDistributionFlow && !isDistributionEditMode;
   const showProjectSelect =
-    !fixedProjectId && (projects?.length ?? 0) > 1;
+    !fixedProjectId && (projects?.length ?? 0) > 1 && !isDistributionEditMode;
   const selectedProjectId = form.watch("project_id") || "";
   const hasProjectContext = Boolean(
     (fixedProjectId ?? selectedProjectId ?? "").trim()
@@ -505,7 +538,7 @@ export function LogEventDialog({
   }, [type, open]);
 
   useEffect(() => {
-    if (!open || !isDistributionFlow) return;
+    if (!open || !isDistributionFlow || isDistributionEditMode) return;
     const focus =
       distributionInitialFocus ??
       (defaultDistributionPlatform ? "post_url" : "platform");
@@ -520,16 +553,73 @@ export function LogEventDialog({
   }, [
     open,
     isDistributionFlow,
+    isDistributionEditMode,
     distributionInitialFocus,
     defaultDistributionPlatform,
   ]);
 
+  const editBundleKey = distributionEdit
+    ? `${distributionEdit.anchorTimelineId}:${distributionEdit.bundle.map((e) => e.id).join(",")}:${distributionEdit.groupDescription ?? ""}`
+    : "";
+
   useEffect(() => {
     if (!open || !isDistributionFlow) return;
+    if (distributionEdit) {
+      const h = hydrateDistributionEdit(
+        distributionEdit.bundle,
+        distributionEdit.groupDescription
+      );
+      setEditContentGroupId(h.contentGroupId);
+      form.reset({
+        project_id: distributionEdit.bundle[0]!.project_id,
+        type: "distribution",
+        entry_date: new Date().toISOString().slice(0, 10),
+        title: h.contentTitle,
+        description: h.globalNotes,
+        external_url: "",
+        url: "",
+        platform: "reddit",
+        image_storage_path: null,
+        amount: "",
+        category: "",
+        revenue_source: "",
+        partner_name: "",
+        revenue_share_percentage: "",
+        dist_views: "",
+        cost_type: "one_time",
+        recurrence_option: "monthly",
+        recurrence_label: "",
+        linked_distribution_entry_id: "",
+        dist_subreddit: "",
+        build_kind: "progress",
+      });
+      setDistributionEntries(
+        h.platformRows.map((row) => ({
+          id: row.id,
+          timelineId: row.timelineId,
+          platform: row.platform,
+          subreddit: row.subreddit,
+          url: row.url,
+          views: row.views,
+          notes: row.notes,
+          entry_date: row.entry_date,
+          persistedMetrics: row.persistedMetrics,
+        }))
+      );
+      return;
+    }
+    setEditContentGroupId(null);
     const day = new Date().toISOString().slice(0, 10);
     const firstPlatform = defaultDistributionPlatform ?? "reddit";
     setDistributionEntries([makeDistributionEntry(day, firstPlatform)]);
-  }, [open, isDistributionFlow, defaultDistributionPlatform]);
+  }, [
+    open,
+    isDistributionFlow,
+    defaultDistributionPlatform,
+    editBundleKey,
+    distributionEdit,
+    form,
+  ]);
 
   const updateDistributionEntry = (
     id: string,
@@ -591,6 +681,95 @@ export function LogEventDialog({
           return;
         }
 
+        if (distributionEdit) {
+          const originalIds = distributionEdit.bundle.map((e) => e.id);
+          const keptIds = new Set(
+            nonEmptyEntries
+              .map((e) => e.timelineId)
+              .filter((id): id is string => Boolean(id))
+          );
+          const deleted_timeline_ids = originalIds.filter((id) => !keptIds.has(id));
+
+          const platformPayloads: Array<{
+            timeline_id?: string;
+            platform: DistributionPlatform;
+            entry_date: string;
+            subreddit: string | null;
+            url: string;
+            notes: string;
+            metrics: DistributionMetrics | null;
+          }> = [];
+
+          for (const entry of nonEmptyEntries) {
+            const parsedUrl = z.string().url().safeParse(entry.url.trim());
+            if (!parsedUrl.success) {
+              toast.error("Each platform entry needs a valid link.");
+              return;
+            }
+            const rawViews = entry.views.trim();
+            const parsedViews: number | null =
+              rawViews.length === 0 ? null : Number.parseInt(rawViews, 10);
+            if (
+              parsedViews !== null &&
+              (!Number.isFinite(parsedViews) || parsedViews < 0)
+            ) {
+              toast.error("Views must be a non-negative number.");
+              return;
+            }
+            const metrics = mergePlatformMetricsForSave(
+              entry.views,
+              entry.persistedMetrics
+            );
+            platformPayloads.push({
+              timeline_id: entry.timelineId,
+              platform: entry.platform,
+              entry_date:
+                entry.entry_date || new Date().toISOString().slice(0, 10),
+              subreddit:
+                entry.platform === "reddit" && entry.subreddit.trim()
+                  ? entry.subreddit.trim()
+                  : null,
+              url: parsedUrl.data,
+              notes: entry.notes.trim(),
+              metrics,
+            });
+          }
+
+          const res = await saveDistributionBundleAction({
+            project_id: projectIdForSubmit,
+            content_title: title || null,
+            global_notes: globalNotes,
+            existing_content_group_id: editContentGroupId,
+            platforms: platformPayloads,
+            deleted_timeline_ids,
+          });
+
+          if ("error" in res) {
+            toast.error(res.error);
+            return;
+          }
+          toast.success("Distribution updated");
+          setOpen(false);
+          router.refresh();
+          return;
+        }
+
+        let sharedGroupId: string | null = null;
+        if (nonEmptyEntries.length > 1 && isPro) {
+          const groupTitle =
+            title.trim() ||
+            `Distribution — ${new Date().toISOString().slice(0, 10)}`;
+          const cg = await createDistributionContentGroupAction({
+            title: groupTitle.slice(0, 200),
+            description: globalNotes.trim() || null,
+          });
+          if ("error" in cg) {
+            toast.error(cg.error);
+            return;
+          }
+          sharedGroupId = cg.content_group_id;
+        }
+
         const payloads: LogEventInput[] = [];
         for (const entry of nonEmptyEntries) {
           const parsedUrl = z.string().url().safeParse(entry.url.trim());
@@ -611,6 +790,7 @@ export function LogEventDialog({
           const combinedNotes = [globalNotes, entry.notes.trim()]
             .filter(Boolean)
             .join("\n\n");
+          const rowNotes = sharedGroupId ? entry.notes.trim() : combinedNotes;
 
           payloads.push({
             type: "distribution",
@@ -618,7 +798,7 @@ export function LogEventDialog({
             entry_date: entry.entry_date || new Date().toISOString().slice(0, 10),
             platform: entry.platform,
             title: title || null,
-            notes: combinedNotes,
+            notes: rowNotes,
             url: parsedUrl.data,
             image_storage_path: null,
             metrics: parsedViews === null ? undefined : { views: parsedViews },
@@ -626,7 +806,7 @@ export function LogEventDialog({
               entry.platform === "reddit" && entry.subreddit.trim()
                 ? entry.subreddit.trim()
                 : null,
-            content_group_id: null,
+            content_group_id: sharedGroupId,
             new_content_group_title: null,
             new_content_group_description: null,
           });
@@ -800,12 +980,18 @@ export function LogEventDialog({
           {isDistributionFlow ? (
             <>
               <DialogTitle className="text-lg font-semibold tracking-tight">
-                {distQuick ? "Quick log post" : "Log post"}
+                {isDistributionEditMode
+                  ? "Edit post"
+                  : distQuick
+                    ? "Quick log post"
+                    : "Log post"}
               </DialogTitle>
               <DialogDescription className="text-[13px] leading-relaxed text-zinc-600">
-                {distQuick
-                  ? "Platform, link, title, and views — add more detail anytime from Distribution."
-                  : "Track how this post performs over time"}
+                {isDistributionEditMode
+                  ? "Same layout as logging a new post — content, then one row per platform."
+                  : distQuick
+                    ? "Platform, link, title, and views — add more detail anytime from Distribution."
+                    : "Track how this post performs over time"}
               </DialogDescription>
             </>
           ) : (
@@ -1103,6 +1289,53 @@ export function LogEventDialog({
                   ))}
                 </div>
               </div>
+              {isDistributionEditMode && distributionEdit?.bundle[0] ? (
+                <div className="space-y-3 border-t border-zinc-200/80 pt-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    Performance
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-zinc-500">
+                    Optional analytics screenshots for the post you opened from. Extra
+                    engagement fields from detection merge into this row when you apply.
+                  </p>
+                  <DistributionEditAttachmentsPanel
+                    timelineEntryId={distributionEdit.anchorTimelineId}
+                    projectId={distributionEdit.bundle[0].project_id}
+                    userId={distributionEdit.bundle[0].user_id}
+                    isPro={isPro}
+                    mockReadOnly={distributionAttachmentsReadOnly}
+                    metrics={
+                      mergePlatformMetricsForSave(
+                        distributionEntries.find(
+                          (e) =>
+                            e.timelineId === distributionEdit.anchorTimelineId
+                        )?.views ?? "",
+                        distributionEntries.find(
+                          (e) =>
+                            e.timelineId === distributionEdit.anchorTimelineId
+                        )?.persistedMetrics
+                      ) ?? {}
+                    }
+                    onMetricsChange={(m) => {
+                      const anchor = distributionEdit.anchorTimelineId;
+                      setDistributionEntries((prev) =>
+                        prev.map((row) =>
+                          row.timelineId === anchor
+                            ? {
+                                ...row,
+                                persistedMetrics: m,
+                                views:
+                                  m.views !== undefined
+                                    ? String(m.views)
+                                    : row.views,
+                              }
+                            : row
+                        )
+                      );
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
           {effectiveType === "insight" ? (
@@ -1384,7 +1617,9 @@ export function LogEventDialog({
                 : defaultEventType === "cost"
                   ? "Save cost"
                   : isDistributionFlow
-                    ? "Log post"
+                    ? isDistributionEditMode
+                      ? "Save changes"
+                      : "Log post"
                     : "Save event"}
             </Button>
           </DialogFooter>

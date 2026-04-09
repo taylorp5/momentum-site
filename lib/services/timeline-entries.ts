@@ -96,11 +96,7 @@ function buildInsertRow(
         content_group_id: data.content_group_id ?? null,
         subreddit: sub,
         ...nullFinancial,
-        ...taxonomy(
-          "distribution",
-          data.content_group_id ? "cross_post" : "distribution_post",
-          meta
-        ),
+        ...taxonomy("distribution", "distribution_post", meta),
         source_type,
         source_metadata,
       };
