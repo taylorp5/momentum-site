@@ -266,7 +266,7 @@ export async function saveDistributionBundleAction(
   const titleStr = content_title?.trim() || "Distribution post";
   const oldGroupId = existing_content_group_id ?? null;
 
-  const proj = await getProject(project_id, user.id);
+  const proj = await getProject(user.id, project_id);
   if (!proj) return { error: "Invalid project." };
 
   const activeTimelineIds = new Set<string>();
