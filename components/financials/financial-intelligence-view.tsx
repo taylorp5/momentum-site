@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { format } from "date-fns";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -10,9 +11,11 @@ import {
   Info,
   Layers,
   Lock,
+  Pencil,
 } from "lucide-react";
 import { ProAnalyticsGate } from "@/components/billing/pro-analytics-gate";
 import { usePlan } from "@/components/billing/plan-context";
+import { EditRevenueDialog } from "@/components/financials/edit-revenue-dialog";
 import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import {
   dashCard,
@@ -30,10 +33,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type {
   FinancialIntelligenceSnapshot,
   FinancialProjectFilter,
   FinancialRangeKey,
+  FinancialRevenueEntry,
 } from "@/lib/data/financial-intelligence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -410,6 +422,17 @@ export function FinancialIntelligenceView({
   const s = snapshot;
   const insight = dashboardInsight(s);
   const sortedProjects = sortProjectsForPicker(projects);
+  const [editRevenueEntry, setEditRevenueEntry] =
+    useState<FinancialRevenueEntry | null>(null);
+
+  const filteredProjectName =
+    activeProjectFilter === "all"
+      ? null
+      : sortedProjects.find((p) => p.id === activeProjectFilter)?.name ?? null;
+  const projectSelectLabel =
+    activeProjectFilter === "all"
+      ? "All projects"
+      : filteredProjectName ?? "All projects";
 
   const defaultLogRevenueProjectId =
     activeProjectFilter !== "all" ? activeProjectFilter : null;
@@ -622,7 +645,9 @@ export function FinancialIntelligenceView({
             }
           >
             <SelectTrigger className="h-10 rounded-lg border-zinc-200 text-[13px]">
-              <SelectValue placeholder="Project scope" />
+              <SelectValue placeholder="Project scope">
+                {projectSelectLabel}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All projects</SelectItem>
@@ -676,6 +701,107 @@ export function FinancialIntelligenceView({
           }
         />
       </div>
+
+      <section className="space-y-4 border-t border-zinc-200/60 pt-10">
+        <div className="space-y-1">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            Revenue entries
+          </h2>
+          <p className="text-[13px] leading-relaxed text-zinc-600">
+            Line items in {s.periodLabel}
+            {filteredProjectName ? (
+              <>
+                {" "}
+                for <span className="font-medium text-zinc-800">{filteredProjectName}</span>
+              </>
+            ) : null}
+            . Use <span className="font-medium text-zinc-800">Log revenue</span> above to add
+            rows; edit inline here.
+          </p>
+        </div>
+        {s.revenueEntries.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-zinc-200/90 bg-zinc-50/60 px-4 py-8 text-center">
+            <p className="text-[14px] text-zinc-600">No revenue logged in this period.</p>
+            <div className="mt-3 flex justify-center">{logRevenueTrigger}</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-zinc-200/90">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-zinc-50/90 hover:bg-zinc-50/90">
+                  <TableHead className="w-[112px]">Date</TableHead>
+                  {activeProjectFilter === "all" ? (
+                    <TableHead className="min-w-[140px]">Project</TableHead>
+                  ) : null}
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-[110px]">Type</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead className="min-w-[160px]">Notes</TableHead>
+                  <TableHead className="w-[100px] text-right"> </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {s.revenueEntries.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-zinc-50/80">
+                    <TableCell className="whitespace-nowrap text-[13px] text-zinc-600">
+                      {format(new Date(row.entry_date), "MMM d, yyyy")}
+                    </TableCell>
+                    {activeProjectFilter === "all" ? (
+                      <TableCell className="text-[13px] font-medium text-zinc-900">
+                        {row.project_name}
+                      </TableCell>
+                    ) : null}
+                    <TableCell className="text-right text-[13px] font-semibold tabular-nums text-zinc-950">
+                      {money.format(row.amount)}
+                    </TableCell>
+                    <TableCell className="text-[12px] text-zinc-600">
+                      {row.is_recurring ? (
+                        <span>
+                          Recurring
+                          {row.recurrence_label ? (
+                            <span className="block text-[11px] text-zinc-500">
+                              {row.recurrence_label}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        "One-time"
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-[13px] text-zinc-700">
+                      {row.revenue_source ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[220px] truncate text-[13px] text-zinc-500">
+                      {row.description?.trim() || "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1 text-[12px] text-zinc-700"
+                        onClick={() => setEditRevenueEntry(row)}
+                      >
+                        <Pencil className="size-3.5" strokeWidth={1.75} />
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
+
+      <EditRevenueDialog
+        entry={editRevenueEntry}
+        open={editRevenueEntry != null}
+        onOpenChange={(next) => {
+          if (!next) setEditRevenueEntry(null);
+        }}
+        onSaved={() => setEditRevenueEntry(null)}
+      />
 
       <section className="space-y-4 border-t border-zinc-200/60 pt-10">
         <div className="flex items-center gap-2 text-zinc-500">

@@ -1,4 +1,5 @@
 import { ensureOverheadProject } from "@/lib/data/overhead-project";
+import { listProjectSummaries } from "@/lib/data/projects";
 import { listTimelineByTypesSince } from "@/lib/data/timeline";
 import type { TimelineEntry } from "@/types/momentum";
 import { z } from "zod";
@@ -122,6 +123,19 @@ export type FinancialDealRow = {
   entryDate: string;
 };
 
+/** One revenue timeline row in the current Financials range + project filter. */
+export type FinancialRevenueEntry = {
+  id: string;
+  project_id: string;
+  project_name: string;
+  amount: number;
+  entry_date: string;
+  revenue_source: string | null;
+  is_recurring: boolean;
+  recurrence_label: string | null;
+  description: string;
+};
+
 export type FinancialIntelligenceSnapshot = {
   periodLabel: string;
   sinceDate: string;
@@ -139,6 +153,8 @@ export type FinancialIntelligenceSnapshot = {
   dealRows: FinancialDealRow[];
   /** True when sum of deal percentages exceeds 100% before capping. */
   shareRatesCapped: boolean;
+  /** Revenue line items in range (newest first). */
+  revenueEntries: FinancialRevenueEntry[];
 };
 
 function buildInsight(
@@ -239,6 +255,31 @@ export async function getFinancialIntelligenceSnapshot(
     };
   });
 
+  const summaries = await listProjectSummaries(userId);
+  const nameById = new Map(summaries.map((p) => [p.id, p.name]));
+
+  const revenueEntries: FinancialRevenueEntry[] = [...revenueRows]
+    .sort((a, b) => {
+      const d = b.entry_date.localeCompare(a.entry_date);
+      if (d !== 0) return d;
+      return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    })
+    .map((r) => ({
+      id: r.id,
+      project_id: r.project_id,
+      project_name: nameById.get(r.project_id) ?? "Project",
+      amount: r.amount ?? 0,
+      entry_date: r.entry_date,
+      revenue_source: r.revenue_source?.trim()
+        ? r.revenue_source.trim()
+        : null,
+      is_recurring: Boolean(r.is_recurring),
+      recurrence_label: r.recurrence_label?.trim()
+        ? r.recurrence_label.trim()
+        : null,
+      description: r.description ?? "",
+    }));
+
   return {
     periodLabel,
     sinceDate,
@@ -253,5 +294,6 @@ export async function getFinancialIntelligenceSnapshot(
     costsByCategory,
     dealRows: dealRowModels,
     shareRatesCapped,
+    revenueEntries,
   };
 }
