@@ -2,7 +2,8 @@ import { DISTRIBUTION_PLATFORM_LABELS } from "@/lib/constants";
 import type { DashboardInsight } from "@/lib/insights/build-dashboard-insights";
 import { listDistributionEntries } from "@/lib/data/distribution";
 import { getDashboardStats, type NextMove } from "@/lib/data/dashboard";
-import { listTimelineByTypesSince } from "@/lib/data/timeline";
+import { costAmountInPeriod } from "@/lib/cost-recurrence";
+import { listCostEntriesForFinancialPeriod } from "@/lib/data/timeline";
 import { isoDateDaysAgoInclusive } from "@/lib/plan-history";
 import type { DistributionPlatform } from "@/types/momentum";
 
@@ -22,11 +23,12 @@ export async function getFocusModeSnapshot(
   userId: string
 ): Promise<FocusModeSnapshot> {
   const since7 = isoDateDaysAgoInclusive(7);
+  const until = new Date().toISOString().slice(0, 10);
   const [weekEntries, allEntries, stats, costRows] = await Promise.all([
     listDistributionEntries(userId, { dateFrom: since7 }),
     listDistributionEntries(userId, {}),
     getDashboardStats(userId),
-    listTimelineByTypesSince(userId, ["cost"], since7),
+    listCostEntriesForFinancialPeriod(userId, since7, until),
   ]);
 
   let lastPostDate: string | null = null;
@@ -59,7 +61,21 @@ export async function getFocusModeSnapshot(
   const totalViews = allEntries.reduce((s, e) => s + (e.metrics?.views ?? 0), 0);
   const postsThisWeek = weekEntries.length;
   const spendThisWeek = costRows.reduce(
-    (s, r) => s + (typeof r.amount === "number" && r.amount > 0 ? r.amount : 0),
+    (s, r) =>
+      s +
+      costAmountInPeriod(
+        {
+          amount: r.amount ?? 0,
+          entry_date: r.entry_date,
+          billing_type: r.billing_type,
+          recurring_start_date: r.recurring_start_date,
+          recurring_end_date: r.recurring_end_date,
+          recurring_active: r.recurring_active,
+          is_recurring: r.is_recurring,
+        },
+        since7,
+        until
+      ),
     0
   );
 

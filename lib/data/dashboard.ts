@@ -8,9 +8,11 @@ import {
 import { DISTRIBUTION_PLATFORM_LABELS } from "@/lib/constants";
 import { countProjects, listProjectSummaries, listProjects } from "@/lib/data/projects";
 import type { DashboardStatusTone } from "@/lib/dashboard-colors";
+import { costAmountInPeriod } from "@/lib/cost-recurrence";
 import {
   countTimelineEntries,
   countTimelineEntriesSince,
+  listCostEntriesForFinancialPeriod,
   listTimelineByTypesSince,
   listRecentTimeline,
   listTimelineForProject,
@@ -646,22 +648,38 @@ export async function getTakeHomeSummary(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
   );
   const since = monthStart.toISOString().slice(0, 10);
+  const until = now.toISOString().slice(0, 10);
 
-  const rows = await listTimelineByTypesSince(
-    userId,
-    ["revenue", "cost", "deal"],
-    since
-  );
+  const [revDealRows, costRows] = await Promise.all([
+    listTimelineByTypesSince(userId, ["revenue", "deal"], since, until),
+    listCostEntriesForFinancialPeriod(userId, since, until),
+  ]);
+  const rows = [...revDealRows, ...costRows];
 
-  const revenue = rows
+  const revenue = revDealRows
     .filter((r) => r.type === "revenue")
     .reduce((sum, r) => sum + (r.amount ?? 0), 0);
-  const costs = rows
-    .filter((r) => r.type === "cost")
-    .reduce((sum, r) => sum + (r.amount ?? 0), 0);
+  const costs = costRows.reduce(
+    (sum, r) =>
+      sum +
+      costAmountInPeriod(
+        {
+          amount: r.amount ?? 0,
+          entry_date: r.entry_date,
+          billing_type: r.billing_type,
+          recurring_start_date: r.recurring_start_date,
+          recurring_end_date: r.recurring_end_date,
+          recurring_active: r.recurring_active,
+          is_recurring: r.is_recurring,
+        },
+        since,
+        until
+      ),
+    0
+  );
   const revenueSharePercent = Math.min(
     100,
-    rows
+    revDealRows
       .filter((r) => r.type === "deal")
       .reduce((sum, r) => sum + (r.revenue_share_percentage ?? 0), 0)
   );

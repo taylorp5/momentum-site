@@ -6,7 +6,7 @@ import { mockTimelineEntries } from "@/lib/mock-data";
 import type { TimelineEntry } from "@/types/momentum";
 
 const timelineRow =
-  "id, project_id, user_id, type, title, description, image_url, external_url, entry_date, platform, metrics, amount, category, is_recurring, recurrence_label, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, content_group_id, subreddit, event_family, event_subtype, event_metadata, source_type, source_metadata, created_at, updated_at";
+  "id, project_id, user_id, type, title, description, image_url, external_url, entry_date, platform, metrics, amount, category, is_recurring, recurrence_label, billing_type, recurring_start_date, recurring_end_date, recurring_active, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, content_group_id, subreddit, event_family, event_subtype, event_metadata, source_type, source_metadata, created_at, updated_at";
 
 export async function listTimelineForProject(
   userId: string,
@@ -168,6 +168,56 @@ export async function listTimelineByTypesSince(
     query = query.lte("entry_date", untilDate.trim());
   }
   const { data, error } = await query
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) throw error;
+  return (data ?? []) as TimelineEntry[];
+}
+
+/**
+ * Cost rows that may affect [sinceDate, untilDate]: one-time in range, or any
+ * monthly/yearly rule (including legacy `is_recurring`).
+ */
+export async function listCostEntriesForFinancialPeriod(
+  userId: string,
+  sinceDate: string,
+  untilDate: string,
+  projectId?: string | null
+): Promise<TimelineEntry[]> {
+  if (isMockDataMode()) {
+    return mockTimelineEntries
+      .filter(
+        (e) =>
+          e.user_id === userId &&
+          e.type === "cost" &&
+          (!projectId || e.project_id === projectId)
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime()
+      );
+  }
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const ids = await listProjectIds(userId);
+  if (ids.length === 0) return [];
+  if (projectId && !ids.includes(projectId)) return [];
+
+  const since = sinceDate.trim();
+  const until = untilDate.trim();
+  const orClause = `and(entry_date.gte.${since},entry_date.lte.${until}),billing_type.eq.monthly,billing_type.eq.yearly,is_recurring.eq.true`;
+
+  const { data, error } = await supabase
+    .from("timeline_entries")
+    .select(timelineRow)
+    .in("project_id", projectId ? [projectId] : ids)
+    .eq("type", "cost")
+    .or(orClause)
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(500);

@@ -93,6 +93,8 @@ const experimentEvent = baseDate
     }
   });
 
+export const costBillingTypeSchema = z.enum(["one_time", "monthly", "yearly"]);
+
 const costEvent = baseDate
   .extend({
     type: z.literal("cost"),
@@ -101,16 +103,35 @@ const costEvent = baseDate
     amount: z.number().nonnegative(),
     category: z.string().min(1).max(80),
     image_storage_path: z.string().optional().nullable(),
-    is_recurring: z.boolean().optional().default(false),
-    recurrence_label: z.string().max(50).optional().nullable(),
     description: z.string().max(5000).optional().default(""),
+    billing_type: costBillingTypeSchema.optional().default("one_time"),
+    recurring_start_date: z.string().min(1).optional().nullable(),
+    recurring_end_date: z.string().min(1).optional().nullable(),
+    recurring_active: z.boolean().optional().default(true),
+    /** Legacy; server derives from `billing_type` when unset. */
+    is_recurring: z.boolean().optional(),
+    recurrence_label: z.string().max(50).optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    if (data.is_recurring && !data.recurrence_label?.trim()) {
+    let billing = data.billing_type ?? "one_time";
+    if (billing === "one_time" && data.is_recurring) {
+      billing = "monthly";
+    }
+    if (billing === "one_time") return;
+    const start = data.recurring_start_date?.trim();
+    if (!start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Recurrence label is required for recurring costs.",
-        path: ["recurrence_label"],
+        message: "Start date is required for subscriptions.",
+        path: ["recurring_start_date"],
+      });
+    }
+    const end = data.recurring_end_date?.trim();
+    if (start && end && end < start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End date must be on or after start.",
+        path: ["recurring_end_date"],
       });
     }
   })

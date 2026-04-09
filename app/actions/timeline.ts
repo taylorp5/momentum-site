@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { distributionPlatformSchema } from "@/lib/validations/distribution";
 import {
   buildProgressKindSchema,
+  costBillingTypeSchema,
   logEventSchema,
   type BuildProgressKind,
 } from "@/lib/validations/timeline";
@@ -188,6 +189,10 @@ const updateTimelineEntrySchema = z.object({
   platform: distributionPlatformSchema.optional(),
   subreddit: z.string().max(120).nullable().optional(),
   cost_title_override: z.string().max(200).optional(),
+  billing_type: costBillingTypeSchema.optional(),
+  recurring_start_date: z.string().optional().nullable(),
+  recurring_end_date: z.string().optional().nullable(),
+  recurring_active: z.boolean().optional(),
   duration_seconds: z.number().int().min(60).optional(),
   work_session_kind: z
     .enum(["timer_session", "manual_time_entry"])
@@ -218,7 +223,7 @@ export async function updateTimelineEntryAction(
   const { data: row, error: fetchErr } = await supabase
     .from("timeline_entries")
     .select(
-      "id, user_id, project_id, type, title, description, external_url, entry_date, platform, metrics, subreddit, amount, category, is_recurring, recurrence_label, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, image_url, event_metadata, event_subtype"
+      "id, user_id, project_id, type, title, description, external_url, entry_date, platform, metrics, subreddit, amount, category, is_recurring, recurrence_label, billing_type, recurring_start_date, recurring_end_date, recurring_active, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, image_url, event_metadata, event_subtype"
     )
     .eq("id", p.id)
     .eq("user_id", user.id)
@@ -349,6 +354,42 @@ export async function updateTimelineEntryAction(
       if (!target) {
         return { error: "Choose a valid project for this expense." };
       }
+      const rowB = row as Record<string, unknown>;
+      const billingFromRow =
+        typeof rowB.billing_type === "string" ? rowB.billing_type : null;
+      let billing =
+        p.billing_type ??
+        (billingFromRow === "monthly" || billingFromRow === "yearly"
+          ? billingFromRow
+          : rowB.is_recurring
+            ? "monthly"
+            : "one_time");
+      if (billing !== "one_time" && billing !== "monthly" && billing !== "yearly") {
+        billing = "one_time";
+      }
+      const recurring = billing !== "one_time";
+      const recStartRaw =
+        p.recurring_start_date !== undefined && p.recurring_start_date !== null
+          ? p.recurring_start_date.trim().slice(0, 10)
+          : typeof rowB.recurring_start_date === "string"
+            ? String(rowB.recurring_start_date).slice(0, 10)
+            : (row.entry_date as string).slice(0, 10);
+      const recEndRaw =
+        p.recurring_end_date !== undefined
+          ? p.recurring_end_date?.trim().slice(0, 10) || null
+          : typeof rowB.recurring_end_date === "string"
+            ? String(rowB.recurring_end_date).slice(0, 10)
+            : null;
+      const recActive =
+        p.recurring_active !== undefined
+          ? p.recurring_active
+          : rowB.recurring_active !== false;
+      if (recurring && !recStartRaw) {
+        return { error: "Start date is required for subscriptions." };
+      }
+      if (recStartRaw && recEndRaw && recEndRaw < recStartRaw) {
+        return { error: "End date must be on or after start." };
+      }
       const override = p.cost_title_override?.trim();
       updates.title = override
         ? override
@@ -358,6 +399,19 @@ export async function updateTimelineEntryAction(
       updates.amount = amount;
       updates.category = category.trim();
       updates.project_id = p.project_id;
+      updates.entry_date = recurring ? recStartRaw : p.entry_date;
+      updates.billing_type = billing;
+      updates.recurring_start_date = recurring ? recStartRaw : null;
+      updates.recurring_end_date =
+        recurring && recEndRaw && recEndRaw.length >= 8 ? recEndRaw : null;
+      updates.recurring_active = recurring ? recActive : true;
+      updates.is_recurring = recurring;
+      updates.recurrence_label =
+        billing === "monthly"
+          ? "Monthly"
+          : billing === "yearly"
+            ? "Yearly"
+            : null;
       break;
     }
     case "revenue": {

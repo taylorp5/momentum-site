@@ -1,6 +1,10 @@
+import { costAmountInPeriod } from "@/lib/cost-recurrence";
 import { ensureOverheadProject } from "@/lib/data/overhead-project";
 import { listProjectSummaries } from "@/lib/data/projects";
-import { listTimelineByTypesSince } from "@/lib/data/timeline";
+import {
+  listCostEntriesForFinancialPeriod,
+  listTimelineByTypesSince,
+} from "@/lib/data/timeline";
 import type { TimelineEntry } from "@/types/momentum";
 import { z } from "zod";
 
@@ -206,20 +210,45 @@ export async function getFinancialIntelligenceSnapshot(
   await ensureOverheadProject(userId);
   const projectId =
     projectFilter !== "all" ? projectFilter : undefined;
-  const rows = await listTimelineByTypesSince(
-    userId,
-    ["revenue", "cost", "deal"],
-    sinceDate,
-    untilDate,
-    projectId
-  );
+  const [revDealRows, costRows] = await Promise.all([
+    listTimelineByTypesSince(
+      userId,
+      ["revenue", "deal"],
+      sinceDate,
+      untilDate,
+      projectId
+    ),
+    listCostEntriesForFinancialPeriod(
+      userId,
+      sinceDate,
+      untilDate,
+      projectId
+    ),
+  ]);
+  const rows = [...revDealRows, ...costRows];
 
   const revenueRows = rows.filter((r) => r.type === "revenue");
-  const costRows = rows.filter((r) => r.type === "cost");
   const dealRows = rows.filter((r) => r.type === "deal");
 
   const grossRevenue = revenueRows.reduce((s, r) => s + (r.amount ?? 0), 0);
-  const totalCosts = costRows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const totalCosts = costRows.reduce(
+    (s, r) =>
+      s +
+      costAmountInPeriod(
+        {
+          amount: r.amount ?? 0,
+          entry_date: r.entry_date,
+          billing_type: r.billing_type,
+          recurring_start_date: r.recurring_start_date,
+          recurring_end_date: r.recurring_end_date,
+          recurring_active: r.recurring_active,
+          is_recurring: r.is_recurring,
+        },
+        sinceDate,
+        untilDate
+      ),
+    0
+  );
 
   const rawShareSum = dealRows.reduce(
     (s, r) => s + (r.revenue_share_percentage ?? 0),
@@ -241,7 +270,20 @@ export async function getFinancialIntelligenceSnapshot(
   const costsByCategory = aggregateByKey(
     costRows,
     (r) => (r.category?.trim() ? r.category.trim() : "Uncategorized"),
-    (r) => r.amount ?? 0
+    (r) =>
+      costAmountInPeriod(
+        {
+          amount: r.amount ?? 0,
+          entry_date: r.entry_date,
+          billing_type: r.billing_type,
+          recurring_start_date: r.recurring_start_date,
+          recurring_end_date: r.recurring_end_date,
+          recurring_active: r.recurring_active,
+          is_recurring: r.is_recurring,
+        },
+        sinceDate,
+        untilDate
+      )
   ).map(({ key, total }) => ({ category: key, total }));
 
   const dealRowModels: FinancialDealRow[] = dealRows.map((r) => {

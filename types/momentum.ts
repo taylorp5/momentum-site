@@ -30,6 +30,8 @@ export type TimelineEntryType =
   | "deal"
   | "work";
 
+export type CostBillingType = "one_time" | "monthly" | "yearly";
+
 export type DistributionPlatform =
   | "reddit"
   | "tiktok"
@@ -117,6 +119,14 @@ export type TimelineEntry = {
   is_recurring?: boolean | null;
   /** Optional recurrence descriptor when `is_recurring` is true. */
   recurrence_label?: string | null;
+  /** Present when `type === "cost"`: one_time, monthly, or yearly. */
+  billing_type?: CostBillingType | null;
+  /** Present when `type === "cost"` and billing is monthly/yearly. */
+  recurring_start_date?: string | null;
+  /** Present when `type === "cost"`; optional end of subscription (inclusive). */
+  recurring_end_date?: string | null;
+  /** Present when `type === "cost"`; when false, rule is ignored in period totals. */
+  recurring_active?: boolean | null;
   /** Present when `type === "revenue"` (subscriptions, one-time, etc.). */
   revenue_source?: string | null;
   /** Present when `type === "deal"`. */

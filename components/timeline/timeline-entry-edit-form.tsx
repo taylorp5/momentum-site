@@ -18,7 +18,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { DISTRIBUTION_PLATFORM_LABELS } from "@/lib/constants";
 import { PLATFORM_ORDER } from "@/lib/platform-config";
 import type { BuildProgressKind } from "@/lib/validations/timeline";
-import type { DistributionPlatform, TimelineEntry } from "@/types/momentum";
+import type {
+  CostBillingType,
+  DistributionPlatform,
+  TimelineEntry,
+} from "@/types/momentum";
 
 const COST_CATEGORIES = [
   "ads",
@@ -48,6 +52,27 @@ export type TimelineEntryForEdit = TimelineEntry & {
   image_signed_url: string | null;
 };
 
+function initialEntryDateOnForm(e: TimelineEntryForEdit): string {
+  if (e.type !== "cost") return e.entry_date.slice(0, 10);
+  const rec =
+    e.billing_type === "monthly" ||
+    e.billing_type === "yearly" ||
+    Boolean(e.is_recurring);
+  if (rec) {
+    return (
+      e.recurring_start_date?.slice(0, 10) ?? e.entry_date.slice(0, 10)
+    );
+  }
+  return e.entry_date.slice(0, 10);
+}
+
+function initialCostBilling(e: TimelineEntryForEdit): CostBillingType {
+  if (e.type !== "cost") return "one_time";
+  if (e.billing_type === "yearly") return "yearly";
+  if (e.billing_type === "monthly" || e.is_recurring) return "monthly";
+  return "one_time";
+}
+
 export type ExpenseProjectOption = {
   id: string;
   name: string;
@@ -74,7 +99,9 @@ export function TimelineEntryEditForm({
   onDeleted,
 }: Props) {
   const [pending, setPending] = useState(false);
-  const [entryDate, setEntryDate] = useState(entry.entry_date.slice(0, 10));
+  const [entryDate, setEntryDate] = useState(() =>
+    initialEntryDateOnForm(entry)
+  );
   const [title, setTitle] = useState(entry.title);
   const [description, setDescription] = useState(entry.description ?? "");
   const [externalUrl, setExternalUrl] = useState(entry.external_url ?? "");
@@ -120,10 +147,31 @@ export function TimelineEntryEditForm({
     entry.type === "build" ? buildSubtypeToKind(entry.event_subtype) : "progress"
   );
   const [costProjectId, setCostProjectId] = useState(entry.project_id);
+  const [costBilling, setCostBilling] = useState<CostBillingType>(() =>
+    initialCostBilling(entry)
+  );
+  const [costRecurringEnd, setCostRecurringEnd] = useState(
+    entry.type === "cost"
+      ? (entry.recurring_end_date?.slice(0, 10) ?? "")
+      : ""
+  );
+  const [costRecurringActive, setCostRecurringActive] = useState(
+    entry.type === "cost" ? entry.recurring_active !== false : true
+  );
 
   useEffect(() => {
     setCostProjectId(entry.project_id);
   }, [entry.id, entry.project_id]);
+
+  useEffect(() => {
+    setEntryDate(initialEntryDateOnForm(entry));
+    setCostBilling(initialCostBilling(entry));
+    if (entry.type === "cost") {
+      setCostRecurringEnd(entry.recurring_end_date?.slice(0, 10) ?? "");
+      setCostRecurringActive(entry.recurring_active !== false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- gate on id/updated_at so parent entry ref identity does not reset the form
+  }, [entry.id, entry.updated_at, entry.type]);
 
   useEffect(() => {
     setRevenueRecurring(Boolean(entry.is_recurring));
@@ -198,12 +246,29 @@ export function TimelineEntryEditForm({
             toast.error("Choose a valid project.");
             return;
           }
+          if (costBilling !== "one_time" && !entryDate.trim()) {
+            toast.error("Start date is required for subscriptions.");
+            return;
+          }
+          const endTrim = costRecurringEnd.trim();
+          if (entryDate && endTrim && endTrim < entryDate) {
+            toast.error("End date must be on or after start.");
+            return;
+          }
           payload = {
             ...base,
+            entry_date: entryDate,
             project_id: targetPid,
             amount: n,
             category: category.trim(),
             cost_title_override: costTitleOverride.trim() || undefined,
+            billing_type: costBilling,
+            recurring_start_date:
+              costBilling === "one_time" ? null : entryDate,
+            recurring_end_date:
+              costBilling !== "one_time" && endTrim ? endTrim : null,
+            recurring_active:
+              costBilling === "one_time" ? true : costRecurringActive,
           };
           break;
         }
@@ -489,6 +554,49 @@ export function TimelineEntryEditForm({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] text-zinc-600">Billing type</Label>
+            <Select
+              value={costBilling}
+              onValueChange={(v) => setCostBilling(v as CostBillingType)}
+              disabled={disabled || pending}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="one_time">One-time</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {costBilling !== "one_time" ? (
+            <>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-zinc-600">
+                  End date{" "}
+                  <span className="font-normal text-zinc-400">(optional)</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={costRecurringEnd}
+                  onChange={(e) => setCostRecurringEnd(e.target.value)}
+                  disabled={disabled || pending}
+                />
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-zinc-800">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-zinc-300"
+                  checked={costRecurringActive}
+                  onChange={(e) => setCostRecurringActive(e.target.checked)}
+                  disabled={disabled || pending}
+                />
+                Active
+              </label>
+            </>
+          ) : null}
           <div className="space-y-1">
             <Label className="text-[11px] text-zinc-600">
               Custom title <span className="font-normal text-zinc-400">(optional)</span>

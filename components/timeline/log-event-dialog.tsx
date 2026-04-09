@@ -94,8 +94,10 @@ type FormValues = {
   partner_name: string;
   revenue_share_percentage: string;
   dist_views: string;
-  cost_type: "one_time" | "recurring";
-  recurrence_option: "monthly" | "yearly" | "quarterly" | "custom";
+  billing_type: "one_time" | "monthly" | "yearly";
+  recurring_start_date: string;
+  recurring_end_date: string;
+  recurring_active: boolean;
   recurrence_label: string;
   linked_distribution_entry_id: string;
   dist_subreddit: string;
@@ -243,14 +245,39 @@ function buildLogPayload(
       }
       const category = values.category.trim();
       if (!category) return { error: "Choose a category." };
+      const billing = values.billing_type;
+      const start =
+        billing !== "one_time"
+          ? values.recurring_start_date?.trim().slice(0, 10)
+          : "";
+      if (billing !== "one_time" && !start) {
+        return { error: "Add a start date for this subscription." };
+      }
+      const endRaw = values.recurring_end_date?.trim().slice(0, 10) ?? "";
+      if (start && endRaw && endRaw < start) {
+        return { error: "End date must be on or after the start date." };
+      }
+      const entryDate =
+        billing === "one_time" ? values.entry_date : (start as string);
       return {
         type: "cost",
         project_id: values.project_id,
-        entry_date: values.entry_date,
+        entry_date: entryDate,
         amount,
         category,
-        is_recurring: false,
-        recurrence_label: null,
+        billing_type: billing,
+        recurring_start_date: billing === "one_time" ? null : start,
+        recurring_end_date:
+          billing !== "one_time" && endRaw ? endRaw : null,
+        recurring_active:
+          billing === "one_time" ? true : values.recurring_active,
+        is_recurring: billing !== "one_time",
+        recurrence_label:
+          billing === "monthly"
+            ? "Monthly"
+            : billing === "yearly"
+              ? "Yearly"
+              : null,
         description: desc,
       };
     }
@@ -467,6 +494,7 @@ export function LogEventDialog({
   );
   const platformTriggerRef = useRef<HTMLButtonElement | null>(null);
   const postUrlInputRef = useRef<HTMLInputElement | null>(null);
+  const wasLogDialogOpenRef = useRef(false);
 
   const costFlow = (defaultEventType ?? defaultType) === "cost";
   const initialProjectId = fixedProjectId ?? (costFlow ? "" : projects?.[0]?.id ?? "");
@@ -488,8 +516,10 @@ export function LogEventDialog({
       partner_name: "",
       revenue_share_percentage: "",
       dist_views: "",
-      cost_type: "one_time",
-      recurrence_option: "monthly",
+      billing_type: "one_time",
+      recurring_start_date: new Date().toISOString().slice(0, 10),
+      recurring_end_date: "",
+      recurring_active: true,
       recurrence_label: "",
       linked_distribution_entry_id: "",
       dist_subreddit: "",
@@ -532,6 +562,24 @@ export function LogEventDialog({
   const type = form.watch("type");
   const isContextLocked = defaultEventType != null;
   const effectiveType = isContextLocked ? defaultEventType! : type;
+  const costBillingWatch = form.watch("billing_type");
+  const costEntryDateWatch = form.watch("entry_date");
+
+  useEffect(() => {
+    if (effectiveType !== "cost") return;
+    if (costBillingWatch === "one_time") return;
+    const cur = form.getValues("recurring_start_date")?.trim();
+    if (!cur) {
+      form.setValue("recurring_start_date", costEntryDateWatch);
+    }
+  }, [costBillingWatch, costEntryDateWatch, effectiveType, form]);
+
+  const recurringStartWatch = form.watch("recurring_start_date");
+  useEffect(() => {
+    if (effectiveType !== "cost" || costBillingWatch === "one_time") return;
+    const s = recurringStartWatch?.trim();
+    if (s) form.setValue("entry_date", s);
+  }, [recurringStartWatch, costBillingWatch, effectiveType, form]);
   const isDistributionFlow = effectiveType === "distribution";
   const isDistributionEditMode = Boolean(distributionEdit);
   const distQuick =
@@ -554,6 +602,18 @@ export function LogEventDialog({
     if (!open) return;
     setFile(null);
   }, [type, open]);
+
+  useEffect(() => {
+    const was = wasLogDialogOpenRef.current;
+    wasLogDialogOpenRef.current = open;
+    if (!open || was) return;
+    if (defaultEventType !== "cost" || distributionEdit) return;
+    const day = form.getValues("entry_date");
+    form.setValue("billing_type", "one_time");
+    form.setValue("recurring_start_date", day);
+    form.setValue("recurring_end_date", "");
+    form.setValue("recurring_active", true);
+  }, [open, defaultEventType, distributionEdit, form]);
 
   useEffect(() => {
     if (!open || !isDistributionFlow || isDistributionEditMode) return;
@@ -604,8 +664,10 @@ export function LogEventDialog({
         partner_name: "",
         revenue_share_percentage: "",
         dist_views: "",
-        cost_type: "one_time",
-        recurrence_option: "monthly",
+        billing_type: "one_time",
+        recurring_start_date: new Date().toISOString().slice(0, 10),
+        recurring_end_date: "",
+        recurring_active: true,
         recurrence_label: "",
         linked_distribution_entry_id: "",
         dist_subreddit: "",
@@ -871,8 +933,10 @@ export function LogEventDialog({
           partner_name: "",
           revenue_share_percentage: "",
           dist_views: "",
-          cost_type: "one_time",
-          recurrence_option: "monthly",
+          billing_type: "one_time",
+          recurring_start_date: new Date().toISOString().slice(0, 10),
+          recurring_end_date: "",
+          recurring_active: true,
           recurrence_label: "",
           linked_distribution_entry_id: "",
           dist_subreddit: "",
@@ -971,8 +1035,10 @@ export function LogEventDialog({
         partner_name: "",
         revenue_share_percentage: "",
         dist_views: "",
-        cost_type: "one_time",
-        recurrence_option: "monthly",
+        billing_type: "one_time",
+        recurring_start_date: new Date().toISOString().slice(0, 10),
+        recurring_end_date: "",
+        recurring_active: true,
         recurrence_label: "",
         linked_distribution_entry_id: "",
         dist_subreddit: "",
@@ -1099,8 +1165,13 @@ export function LogEventDialog({
                         form.setValue("revenue_share_percentage", "");
                         form.setValue("linked_distribution_entry_id", "");
                         form.setValue("dist_views", "");
-                        form.setValue("cost_type", "one_time");
-                        form.setValue("recurrence_option", "monthly");
+                        form.setValue("billing_type", "one_time");
+                        form.setValue(
+                          "recurring_start_date",
+                          form.getValues("entry_date")
+                        );
+                        form.setValue("recurring_end_date", "");
+                        form.setValue("recurring_active", true);
                         form.setValue("recurrence_label", "");
                         form.setValue("title", "");
                         form.setValue("description", "");
@@ -1521,6 +1592,70 @@ export function LogEventDialog({
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>Billing type</Label>
+                <Select
+                  value={costBillingWatch}
+                  onValueChange={(v) =>
+                    form.setValue(
+                      "billing_type",
+                      v as "one_time" | "monthly" | "yearly"
+                    )
+                  }
+                >
+                  <SelectTrigger className="rounded-lg border-zinc-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="one_time">One-time</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {costBillingWatch !== "one_time" ? (
+                <div className="space-y-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="ev-cost-rec-start">Start date</Label>
+                    <Input
+                      id="ev-cost-rec-start"
+                      type="date"
+                      className="rounded-lg border-zinc-200"
+                      required
+                      value={form.watch("recurring_start_date")}
+                      onChange={(e) =>
+                        form.setValue("recurring_start_date", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ev-cost-rec-end">
+                      End date{" "}
+                      <span className="font-normal text-zinc-500">(optional)</span>
+                    </Label>
+                    <Input
+                      id="ev-cost-rec-end"
+                      type="date"
+                      className="rounded-lg border-zinc-200"
+                      value={form.watch("recurring_end_date")}
+                      onChange={(e) =>
+                        form.setValue("recurring_end_date", e.target.value)
+                      }
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 text-[13px] text-zinc-800">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-zinc-300"
+                      checked={form.watch("recurring_active")}
+                      onChange={(e) =>
+                        form.setValue("recurring_active", e.target.checked)
+                      }
+                    />
+                    Active
+                  </label>
+                </div>
+              ) : null}
+              <div className="space-y-2">
                 <Label htmlFor="ev-cost-desc">Description</Label>
                 <Textarea
                   id="ev-cost-desc"
@@ -1643,18 +1778,32 @@ export function LogEventDialog({
           </div>
           {effectiveType !== "distribution" ? (
             <div className="space-y-2 border-t border-zinc-200/60 pt-4">
-              <Label
-                htmlFor="ev-date-shared"
-                className="text-[13px] font-semibold text-zinc-900"
-              >
-                Date
-              </Label>
-              <Input
-                id="ev-date-shared"
-                type="date"
-                className="h-10 max-w-[11rem] rounded-xl border-zinc-200/90 bg-white shadow-sm"
-                {...form.register("entry_date")}
-              />
+              {effectiveType === "cost" && costBillingWatch !== "one_time" ? (
+                <>
+                  <Label className="text-[13px] font-semibold text-zinc-900">
+                    Timeline date
+                  </Label>
+                  <p className="text-[12px] leading-relaxed text-zinc-500">
+                    Uses your subscription start date — adjust it in the billing section
+                    above.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Label
+                    htmlFor="ev-date-shared"
+                    className="text-[13px] font-semibold text-zinc-900"
+                  >
+                    Date
+                  </Label>
+                  <Input
+                    id="ev-date-shared"
+                    type="date"
+                    className="h-10 max-w-[11rem] rounded-xl border-zinc-200/90 bg-white shadow-sm"
+                    {...form.register("entry_date")}
+                  />
+                </>
+              )}
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">

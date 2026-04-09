@@ -64,6 +64,10 @@ function buildInsertRow(
     category: null as null,
     is_recurring: null as null,
     recurrence_label: null as null,
+    billing_type: "one_time" as const,
+    recurring_start_date: null as null,
+    recurring_end_date: null as null,
+    recurring_active: true,
     revenue_source: null as null,
     partner_name: null as null,
     revenue_share_percentage: null as null,
@@ -160,6 +164,17 @@ function buildInsertRow(
         source_metadata,
       };
     case "cost": {
+      let billing = data.billing_type ?? "one_time";
+      if (billing === "one_time" && (data.is_recurring ?? false)) {
+        billing = "monthly";
+      }
+      const recurring = billing !== "one_time";
+      const startIso = recurring
+        ? (data.recurring_start_date?.trim().slice(0, 10) ?? data.entry_date)
+        : data.entry_date;
+      const endRaw = data.recurring_end_date?.trim().slice(0, 10);
+      const recLabel =
+        billing === "monthly" ? "Monthly" : billing === "yearly" ? "Yearly" : null;
       const customTitle = data.title?.trim();
       return {
         project_id: data.project_id,
@@ -171,12 +186,17 @@ function buildInsertRow(
         description: data.description,
         image_url: data.image_storage_path ?? null,
         external_url: null,
-        entry_date: data.entry_date,
+        entry_date: recurring ? startIso : data.entry_date,
         ...nullDist,
         amount: data.amount,
         category: data.category,
-        is_recurring: data.is_recurring ?? false,
-        recurrence_label: data.is_recurring ? data.recurrence_label?.trim() || null : null,
+        billing_type: billing,
+        recurring_start_date: recurring ? startIso : null,
+        recurring_end_date:
+          recurring && endRaw && endRaw.length >= 8 ? endRaw : null,
+        recurring_active: recurring ? (data.recurring_active ?? true) : true,
+        is_recurring: recurring,
+        recurrence_label: recLabel,
         revenue_source: null,
         partner_name: null,
         revenue_share_percentage: null,
@@ -184,6 +204,7 @@ function buildInsertRow(
         ...taxonomy("financial", "cost", {
           category: data.category,
           amount: data.amount,
+          billing_type: billing,
         }),
         source_type,
         source_metadata,

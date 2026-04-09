@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
+import { costRecurringContextLine } from "@/lib/cost-recurrence";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -70,6 +71,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const project = searchParams.get("project") ?? "all";
@@ -318,15 +320,37 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                       {row.description || row.title}
                     </TableCell>
                     <TableCell className="text-zinc-600">
-                      <span
-                        className={
-                          row.is_recurring
-                            ? "inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
-                            : "inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800"
-                        }
-                      >
-                        {row.is_recurring ? "Recurring" : "One-time"}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap gap-1">
+                          {row.billing_type === "monthly" ? (
+                            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-900">
+                              Monthly
+                            </span>
+                          ) : null}
+                          {row.billing_type === "yearly" ? (
+                            <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-900">
+                              Yearly
+                            </span>
+                          ) : null}
+                          {row.billing_type !== "one_time" ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                              Recurring
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-900">
+                              One-time
+                            </span>
+                          )}
+                        </div>
+                        {(() => {
+                          const line = costRecurringContextLine(row, todayIso);
+                          return line ? (
+                            <p className="text-[11px] leading-snug text-zinc-500">
+                              {line}
+                            </p>
+                          ) : null;
+                        })()}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
