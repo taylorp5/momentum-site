@@ -40,7 +40,11 @@ export function DevPlanToggle({ currentPlan }: Props) {
         </CardTitle>
         <p className="text-[13px] font-normal leading-relaxed text-amber-900/80">
           Only appears in <code className="rounded bg-white/80 px-1 py-0.5 font-mono text-[11px]">next dev</code>.
-          Updates your <span className="font-medium">profiles.plan</span> in Supabase. Not for production.
+          You can temporarily enable it in hosted environments with{" "}
+          <code className="rounded bg-white/80 px-1 py-0.5 font-mono text-[11px]">
+            ENABLE_DEV_PLAN_TOGGLE=true
+          </code>
+          . Updates your <span className="font-medium">profiles.plan</span> in Supabase.
         </p>
       </CardHeader>
       <CardContent className="space-y-4 px-5 pb-5 pt-5">

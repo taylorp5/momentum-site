@@ -2,26 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Sparkles } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import { usePlan } from "@/components/billing/plan-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
+  openRevenueCatManageSubscription,
   startRevenueCatPurchase,
   type RevenueCatCheckoutMode,
 } from "@/lib/revenuecat/web";
 
-const PRO_FEATURES = [
-  "Cross-post tracking",
-  "Custom date ranges",
-  "Advanced analytics",
-  "Focus Mode",
-  "Work sessions",
-  "Export story",
+const PRO_OUTCOMES = [
+  "Track what works across platforms (Reddit, TikTok, etc.)",
+  "Use custom date ranges to analyze performance",
+  "Understand what’s growing and what’s not",
+  "Stay consistent with Focus Mode and work sessions",
+  "Turn your work into a shareable story (export story coming soon)",
 ] as const;
-
-const FREE_FEATURES = ["Basic tracking", "Core dashboard", "Project timeline"] as const;
 
 export function UpgradePageClient() {
   const router = useRouter();
@@ -58,72 +56,101 @@ export function UpgradePageClient() {
     }
   }
 
+  async function onManageSubscription() {
+    const opened = await openRevenueCatManageSubscription();
+    if (!opened) {
+      toast.message("Manage subscription will be available after your first active subscription.");
+    }
+  }
+
   async function onRefreshStatus() {
     const active = await refreshProStatus();
     if (active) {
       toast.success("Pro is active.");
       router.push("/dashboard");
       router.refresh();
-    } else {
-      toast.message("Pro entitlement not active yet.");
+      return;
     }
+    toast.message("Pro entitlement is not active yet.");
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
-          Upgrade to Momentum Pro
-        </h1>
-        <p className="text-sm text-zinc-600">$12/month</p>
-        <p className="text-sm text-zinc-500">Cancel anytime.</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="rounded-xl border-zinc-200/90">
-          <CardHeader>
-            <CardTitle className="text-base">Free</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-zinc-700">
-            {FREE_FEATURES.map((feature) => (
-              <p key={feature} className="inline-flex items-center gap-2">
-                <Check className="size-3.5 text-zinc-500" />
-                {feature}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-        <Card className="rounded-xl border-zinc-900/15 bg-zinc-900/[0.02]">
-          <CardHeader>
-            <CardTitle className="inline-flex items-center gap-2 text-base">
+    <div className="mx-auto w-full max-w-2xl px-1 py-2">
+      <Card className="rounded-2xl border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+        <CardContent className="space-y-7 p-6 sm:p-8">
+          <div className="space-y-2 text-center">
+            <div className="mx-auto inline-flex size-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
               <Sparkles className="size-4" />
-              Pro
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-zinc-800">
-            {PRO_FEATURES.map((feature) => (
-              <p key={feature} className="inline-flex items-center gap-2">
-                <Check className="size-3.5 text-emerald-600" />
-                {feature}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+            <h1 className="text-balance text-3xl font-semibold tracking-tight text-zinc-950 sm:text-[2.1rem]">
+              Build faster. Ship more. Know what works.
+            </h1>
+            <p className="text-[15px] text-zinc-600">
+              Track your work, distribution, and results — all in one place.
+            </p>
+          </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          className="rounded-lg bg-zinc-900 hover:bg-zinc-800"
-          onClick={() => void onUpgrade()}
-          disabled={pending || isPro}
-        >
-          {isPro ? "Pro active" : pending ? "Processing..." : "Upgrade to Pro"}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => void onRefreshStatus()}>
-          Refresh Pro status
-        </Button>
-      </div>
+          <div className="space-y-1 text-center">
+            <p className="text-[2rem] font-semibold tracking-tight text-zinc-950 sm:text-[2.4rem]">
+              $12 / month
+            </p>
+            <p className="text-sm text-zinc-500">Cancel anytime. No commitment.</p>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="text-center text-sm font-semibold uppercase tracking-[0.1em] text-zinc-600">
+              What Pro unlocks
+            </h2>
+            <ul className="space-y-2.5">
+              {PRO_OUTCOMES.map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-[15px] text-zinc-800">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-2 text-center">
+            {isPro ? (
+              <>
+                <p className="text-[15px] font-medium text-zinc-900">You&apos;re on Pro</p>
+                <Button
+                  type="button"
+                  className="h-11 rounded-lg bg-zinc-900 px-5 text-[14px] font-semibold hover:bg-zinc-800"
+                  onClick={() => void onManageSubscription()}
+                >
+                  Manage subscription
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  className="h-11 rounded-lg bg-zinc-900 px-5 text-[14px] font-semibold hover:bg-zinc-800"
+                  onClick={() => void onUpgrade()}
+                  disabled={pending}
+                >
+                  {pending ? "Processing..." : "Upgrade to Pro — $12/month"}
+                </Button>
+                <p className="text-xs text-zinc-500">Takes less than 30 seconds</p>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {!isPro ? (
+        <div className="pt-3 text-center">
+          <button
+            type="button"
+            className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+            onClick={() => void onRefreshStatus()}
+          >
+            Already purchased? Refresh status
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

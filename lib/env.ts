@@ -11,10 +11,11 @@ export function isMockDataMode(): boolean {
 
 /**
  * Settings “dev plan” control: only in local `next dev`, unless explicitly disabled.
- * Never enable in production builds.
+ * Can be temporarily force-enabled with ENABLE_DEV_PLAN_TOGGLE=true.
  */
 export function isDevPlanToggleEnabled(): boolean {
-  if (process.env.NODE_ENV !== "development") return false;
   if (process.env.DISABLE_DEV_PLAN_TOGGLE === "true") return false;
+  if (process.env.ENABLE_DEV_PLAN_TOGGLE === "true") return true;
+  if (process.env.NODE_ENV !== "development") return false;
   return true;
 }

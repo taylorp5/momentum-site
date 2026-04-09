@@ -19,7 +19,8 @@ const SUPABASE_REQUIRED_ERROR =
   "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.";
 
 /**
- * Flip `profiles.plan` for the signed-in user. Only available in development.
+ * Flip `profiles.plan` for the signed-in user.
+ * Enabled in local dev by default; can be force-enabled with ENABLE_DEV_PLAN_TOGGLE=true.
  */
 export async function setDevPlanForTestingAction(
   input: unknown
