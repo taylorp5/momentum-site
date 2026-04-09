@@ -42,7 +42,7 @@ export function DistributionPerformanceCard({
         </CardTitle>
         <p className="mt-0.5 text-[12px] font-normal leading-relaxed text-zinc-500">
           {totalPosts === 0 && allTimePosts === 0 ? (
-            <>Nothing in this window yet — log a post to compare channels.</>
+            <>No posts yet in {dateLabel.toLowerCase()} — ship your first post to start seeing traction.</>
           ) : (
             <>
               Compare posts and views by channel ·{" "}
@@ -57,7 +57,7 @@ export function DistributionPerformanceCard({
         </p>
         {totalPosts === 0 && allTimePosts > 0 ? (
           <p className="mt-2 text-[12px] font-normal text-zinc-500">
-            No posts in this selected window by post date. All time: {allTimePosts} posts ·{" "}
+            No posts yet in {dateLabel.toLowerCase()}. Ship your next post to restart momentum. All time: {allTimePosts} posts ·{" "}
             {number.format(allTimeViews)} views.
           </p>
         ) : null}

@@ -7,6 +7,7 @@ type PageHeaderProps = {
   title: string;
   description?: string;
   className?: string;
+  titleClassName?: string;
   action?: React.ReactNode;
 };
 
@@ -15,6 +16,7 @@ export function PageHeader({
   title,
   description,
   className,
+  titleClassName,
   action,
 }: PageHeaderProps) {
   return (
@@ -30,11 +32,16 @@ export function PageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-[1.625rem] font-medium leading-tight tracking-tight text-zinc-900 sm:text-[1.875rem] sm:leading-[1.12]">
+        <h1
+          className={cn(
+            "text-[1.625rem] font-medium leading-tight tracking-tight text-zinc-900 sm:text-[1.875rem] sm:leading-[1.12]",
+            titleClassName
+          )}
+        >
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl pt-0.5 text-[14px] font-normal leading-relaxed text-zinc-500">
+          <p className="max-w-2xl pt-0.5 text-[14px] font-normal leading-relaxed text-zinc-600">
             {description}
           </p>
         ) : null}

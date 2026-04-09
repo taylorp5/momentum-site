@@ -91,13 +91,11 @@ function dashboardInsight(s: FinancialIntelligenceSnapshot): InsightBlock {
 function NetIncomeHero({
   net,
   hasActivity,
-  periodLabel,
   grossRevenue,
   totalCosts,
 }: {
   net: number;
   hasActivity: boolean;
-  periodLabel: string;
   grossRevenue: number;
   totalCosts: number;
 }) {
@@ -105,8 +103,28 @@ function NetIncomeHero({
   const negative = net < 0;
 
   const contextLine = !hasActivity
-    ? `Based on ${periodLabel} — add timeline events to see your numbers.`
-    : `From ${money.format(grossRevenue)} revenue and ${money.format(totalCosts)} in costs.`;
+    ? "This month so far — add revenue or expenses to see your numbers."
+    : `This month so far: ${money.format(grossRevenue)} revenue and ${money.format(totalCosts)} in costs.`;
+
+  const statusLine = !hasActivity
+    ? "No activity yet"
+    : grossRevenue === 0 && totalCosts > 0
+      ? "You're investing in this project"
+      : positive
+        ? "This project is profitable"
+        : negative
+          ? "This project is currently losing money"
+          : "This project is close to break-even";
+
+  const simpleInsight = !hasActivity
+    ? "No activity yet — log your first revenue or expense."
+    : grossRevenue === 0 && totalCosts > 0
+      ? `You've spent ${money.format(totalCosts)} and earned ${money.format(0)} this month.`
+      : positive
+        ? "Revenue is covering your costs."
+        : negative
+          ? `You've spent ${money.format(totalCosts)} and earned ${money.format(grossRevenue)} this month.`
+          : "You're close to breaking even.";
 
   return (
     <div
@@ -144,7 +162,19 @@ function NetIncomeHero({
       >
         {hasActivity ? money.format(net) : money.format(0)}
       </p>
+      <p
+        className={cn(
+          "mt-2 text-[14px] font-semibold",
+          !hasActivity && "text-zinc-600",
+          hasActivity && positive && "text-emerald-700",
+          hasActivity && negative && "text-red-700",
+          hasActivity && !positive && !negative && "text-zinc-700"
+        )}
+      >
+        {statusLine}
+      </p>
       <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-zinc-600">{contextLine}</p>
+      <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-zinc-700">{simpleInsight}</p>
     </div>
   );
 }
@@ -229,20 +259,39 @@ function InsightCard({
       <p className="mt-2 text-[13px] leading-relaxed text-zinc-600 sm:text-[14px]">{block.body}</p>
       {showActions ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Link
-            href="/costs"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "rounded-lg text-[12px] font-medium no-underline"
-            )}
-          >
-            Review expenses
-          </Link>
           {!hasActivity ? (
-            <span className="text-[12px] text-zinc-500">
-              Or log from any project timeline.
-            </span>
-          ) : block.variant === "investing" ? (
+            <>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  buttonVariants({ variant: "default", size: "sm" }),
+                  "rounded-lg text-[12px] font-medium no-underline"
+                )}
+              >
+                Log revenue
+              </Link>
+              <Link
+                href="/costs"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "rounded-lg text-[12px] font-medium no-underline"
+                )}
+              >
+                Log expense
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/costs"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "rounded-lg text-[12px] font-medium no-underline"
+              )}
+            >
+              Review expenses
+            </Link>
+          )}
+          {!hasActivity ? null : block.variant === "investing" ? (
             <span className="text-[12px] text-zinc-500">Log revenue when you get paid.</span>
           ) : null}
         </div>
@@ -321,13 +370,13 @@ export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
       <BreakdownBars
         label="Revenue by source"
         rows={revenueRows}
-        emptyHint="No revenue with amounts this period."
+        emptyHint="No revenue yet — log your first payment to start tracking sources."
         accent="revenue"
       />
       <BreakdownBars
         label="Costs by category"
         rows={costRows}
-        emptyHint="No expenses this period."
+        emptyHint="No expenses yet — track tools, ads, and subscriptions."
         accent="costs"
       />
       <Card className={cn(dashCard, "border-zinc-200/50 bg-zinc-50/20 py-0 shadow-none lg:col-span-2")}>
@@ -405,7 +454,6 @@ export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
       <NetIncomeHero
         net={s.netIncome}
         hasActivity={s.hasActivity}
-        periodLabel={s.periodLabel}
         grossRevenue={s.grossRevenue}
         totalCosts={s.totalCosts}
       />

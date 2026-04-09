@@ -506,6 +506,9 @@ export function LogEventDialog({
   const showProjectSelect =
     !fixedProjectId && (projects?.length ?? 0) > 1;
   const selectedProjectId = form.watch("project_id") || "";
+  const hasProjectContext = Boolean(
+    (fixedProjectId ?? selectedProjectId ?? "").trim()
+  );
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);
   const fixedProject = fixedProjectId
     ? projects?.find((p) => p.id === fixedProjectId)
@@ -587,6 +590,14 @@ export function LogEventDialog({
 
       let imagePath: string | null = null;
       const submitType = defaultEventType ?? values.type;
+      const projectIdForSubmit = (fixedProjectId ?? values.project_id ?? "").trim();
+      if (
+        submitType === "distribution" &&
+        !z.string().uuid().safeParse(projectIdForSubmit).success
+      ) {
+        toast.error("Choose a project before logging a post.");
+        return;
+      }
       if (
         submitType === "snapshot" ||
         submitType === "build" ||
@@ -609,8 +620,7 @@ export function LogEventDialog({
             return;
           }
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const projectForPath = fixedProjectId ?? values.project_id;
-          const path = `${userId}/${projectForPath}/${Date.now()}-${safeName}`;
+          const path = `${userId}/${projectIdForSubmit}/${Date.now()}-${safeName}`;
           const { error: upErr } = await supabase.storage
             .from(TIMELINE_BUCKET)
             .upload(path, file, { cacheControl: "3600", upsert: false });
@@ -629,7 +639,7 @@ export function LogEventDialog({
         {
           ...values,
           type: defaultEventType ?? values.type,
-          project_id: fixedProjectId ?? values.project_id,
+          project_id: projectIdForSubmit,
         },
         imagePath
       );
@@ -770,6 +780,11 @@ export function LogEventDialog({
                 </SelectContent>
               </Select>
             </div>
+          ) : null}
+          {isDistributionFlow && !fixedProject && (projects?.length ?? 0) === 0 ? (
+            <p className="rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[12px] text-amber-900">
+              Add a project first, then log distribution posts under that project.
+            </p>
           ) : null}
           {!showProjectSelect && fixedProject ? (
             <div className="space-y-1.5">
@@ -1378,7 +1393,7 @@ export function LogEventDialog({
             <Button
               type="submit"
               className="rounded-lg bg-zinc-900 hover:bg-zinc-800"
-              disabled={pending}
+              disabled={pending || (isDistributionFlow && !hasProjectContext)}
             >
               {pending
                 ? "Saving…"

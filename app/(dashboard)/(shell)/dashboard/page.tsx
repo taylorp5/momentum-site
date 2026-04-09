@@ -24,6 +24,7 @@ import {
   getBestPerformingPost,
   getDashboardStats,
   getDistributionPerformance,
+  getDashboardProgressSnapshot,
   getRecentActivity,
   getTakeHomeSummary,
   getYourStorySnapshot,
@@ -96,15 +97,17 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     bestPost,
     story,
     takeHome,
+    progress,
   ] = await Promise.all([
     getDashboardStats(user.id),
     listDistributionEntries(user.id, {}),
     listProjects(user.id),
-    getRecentActivity(user.id, 4),
+    getRecentActivity(user.id, 5),
     getDistributionPerformance(user.id, filters, isPro),
     getBestPerformingPost(user.id),
     getYourStorySnapshot(user.id),
     getTakeHomeSummary(user.id),
+    getDashboardProgressSnapshot(user.id),
   ]);
 
   const allInsights =
@@ -137,13 +140,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   );
 
   const sectionLabelClass =
-    "inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400";
+    "inline-flex items-center gap-1.5 text-[16px] font-semibold tracking-[0.02em] text-zinc-800";
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Overview"
         title="Dashboard"
+        titleClassName="text-[34px] font-semibold leading-[1.1] tracking-tight"
         description={`${story.totalPosts.toLocaleString()} posts · ${story.totalViews.toLocaleString()} views · last activity ${lastActivityLabel}`}
         action={toolbar}
       />
@@ -159,9 +163,17 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               bestPlatformLabel={bestPlatformLabel}
               bestPlatformKey={bestPlatformKey}
               lastActivityLabel={lastActivityLabel}
+              activeStreakDays={progress.activeStreakDays}
               projects={projects}
               hasProjects={hasProjects}
             />
+            <p className="text-[14px] text-zinc-700">
+              {progress.todayCount === 0
+                ? "Nothing logged today yet. Ship something to build momentum."
+                : `You logged ${progress.todayCount} event${progress.todayCount === 1 ? "" : "s"} today${
+                    progress.todayBreakdown ? ` · ${progress.todayBreakdown}` : ""
+                  }.`}
+            </p>
           </section>
 
           {showTrends ? (
@@ -222,7 +234,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           {isWidgetVisible(prefs, "revenue") ? (
             <section className="space-y-1.5">
               <h2 className={sectionLabelClass}>Financials</h2>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-[12px] text-zinc-600">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-[14px] text-zinc-700">
                 <span>
                   Revenue: <span className="font-medium text-zinc-900">${takeHome.revenue.toLocaleString()}</span>
                 </span>
@@ -247,11 +259,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             bestPlatformLabel={bestPlatformLabel}
             bestPlatformKey={bestPlatformKey}
             lastActivityLabel={lastActivityLabel}
+            activeStreakDays={progress.activeStreakDays}
             projects={projects}
             hasProjects={false}
           />
           {isWidgetVisible(prefs, "revenue") ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-[12px] text-zinc-600">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-[14px] text-zinc-700">
               <span>
                 Revenue: <span className="font-medium text-zinc-900">${takeHome.revenue.toLocaleString()}</span>
               </span>

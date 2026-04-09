@@ -85,7 +85,7 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
       <CardHeader className={cn(dashCardHeader, "bg-transparent")}>
         <CardTitle className={cn(dashSectionTitle, "text-[14px]")}>Recent activity</CardTitle>
         <p className={dashSectionDesc}>
-          Everything you log lands here — distribution posts are timeline events too.
+          Your latest builder moves, all in one place.
         </p>
       </CardHeader>
       <CardContent className="px-0 pt-0">
@@ -103,15 +103,15 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                     <Megaphone className="size-4" strokeWidth={1.5} />
                   </span>
                   <div>
-                    <p className="text-[13px] font-medium text-zinc-500">No activity yet</p>
-                    <p className="text-[12px] text-zinc-400">Log an event from any project — it shows up here once.</p>
+                    <p className="text-[13px] font-medium text-zinc-600">No activity yet</p>
+                    <p className="text-[12px] text-zinc-500">Ship your first update and your momentum feed starts here.</p>
                   </div>
                   <span className="text-[11px] text-zinc-400">—</span>
                 </div>
               ))}
             </div>
             <div className="px-4 py-3.5">
-              <p className="text-[13px] font-normal text-zinc-500">No posts logged yet</p>
+              <p className="text-[13px] font-normal text-zinc-600">No recent activity yet</p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <Link
                   href="/projects"

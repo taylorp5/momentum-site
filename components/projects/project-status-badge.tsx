@@ -16,7 +16,7 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
     <Badge
       variant="outline"
       className={cn(
-        "rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+        "rounded-full border px-2.5 py-1 text-[11.5px] font-semibold uppercase tracking-[0.08em]",
         tone[status]
       )}
     >

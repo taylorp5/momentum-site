@@ -64,7 +64,7 @@ export function FreeDistributionSummary({
           </p>
           <p className="mt-2 text-[12px] font-normal leading-relaxed text-zinc-500">
             {totalPosts === 0 && allTimeViews === 0 ? (
-              <>Log posts with view counts to see traction here.</>
+              <>No posts yet in {dateLabel.toLowerCase()}. Ship your first post to start seeing traction.</>
             ) : (
               <>
                 {totalPosts} {totalPosts === 1 ? "post" : "posts"} in this window ·{" "}

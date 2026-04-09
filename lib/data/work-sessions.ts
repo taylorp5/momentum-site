@@ -18,7 +18,9 @@ export type WorkSessionSummary = {
 };
 
 export type RunningWorkSessionBanner = {
+  projectId: string;
   projectName: string;
+  status: "running" | "paused";
   startedAt: string;
   durationSeconds: number;
   lastResumedAt: string | null;
@@ -109,14 +111,17 @@ export async function getRunningWorkSessionBanner(
   const { data, error } = await supabase
     .from("work_sessions")
     .select(
-      "started_at, duration_seconds, last_resumed_at, projects!inner(name)"
+      "project_id, status, started_at, duration_seconds, last_resumed_at, projects!inner(name)"
     )
     .eq("user_id", userId)
-    .eq("status", "running")
+    .in("status", ["running", "paused"])
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error || !data) return null;
   const row = data as {
+    project_id: string;
+    status: "running" | "paused";
     started_at: string;
     duration_seconds: number;
     last_resumed_at: string | null;
@@ -124,7 +129,9 @@ export async function getRunningWorkSessionBanner(
   };
   const project = Array.isArray(row.projects) ? row.projects[0] : row.projects;
   return {
+    projectId: row.project_id,
     projectName: project?.name ?? "Project",
+    status: row.status,
     startedAt: row.started_at,
     durationSeconds: row.duration_seconds,
     lastResumedAt: row.last_resumed_at,

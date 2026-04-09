@@ -76,17 +76,26 @@ export default async function ProjectsPage() {
           value={projects.length}
           icon={FolderKanban}
           tone="accent"
+          className="py-4"
+          titleClassName="text-[11px] tracking-[0.11em]"
+          valueClassName="text-[2.05rem] sm:text-[2.2rem]"
         />
         <StatCard
           title="Timeline entries"
           value={totalTimeline}
           icon={GitBranch}
+          className="py-4"
+          titleClassName="text-[11px] tracking-[0.11em]"
+          valueClassName="text-[2.05rem] sm:text-[2.2rem]"
         />
         <StatCard
           title="Distribution posts"
           value={totalDistribution}
           icon={Share2}
           tone="success"
+          className="py-4"
+          titleClassName="text-[11px] tracking-[0.11em]"
+          valueClassName="text-[2.05rem] sm:text-[2.2rem]"
         />
       </div>
 
@@ -94,7 +103,7 @@ export default async function ProjectsPage() {
         <EmptyState
           icon={<FolderOpen className="size-6" strokeWidth={1.5} />}
           title="No projects yet"
-          description="Every idea, app, or product lives here"
+          description="Start tracking your first idea or product."
           action={<CreateProjectDialog triggerLabel="Create your first project" />}
           footnote={isMockDataMode() ? "Preview mode is read-only." : undefined}
         />

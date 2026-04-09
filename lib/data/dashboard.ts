@@ -140,6 +140,82 @@ export async function getDashboardStats(userId: string) {
   };
 }
 
+export type DashboardProgressSnapshot = {
+  activeStreakDays: number;
+  todayCount: number;
+  todayBreakdown: string;
+};
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function labelForType(t: string): string {
+  switch (t) {
+    case "distribution":
+      return "post";
+    case "build":
+      return "build update";
+    case "work":
+      return "work session";
+    case "insight":
+      return "insight";
+    case "cost":
+      return "cost";
+    case "revenue":
+      return "revenue";
+    case "deal":
+      return "deal";
+    default:
+      return "event";
+  }
+}
+
+/**
+ * Builder-oriented progress snapshot for dashboard microcopy:
+ * - streak counts only when user shipped today
+ * - today breakdown keeps to top 3 categories
+ */
+export async function getDashboardProgressSnapshot(
+  userId: string
+): Promise<DashboardProgressSnapshot> {
+  const recent = await listRecentTimeline(userId, 300);
+  const today = todayIsoDate();
+
+  const todayRows = recent.filter((r) => r.entry_date === today);
+  const todayCount = todayRows.length;
+
+  const byType = new Map<string, number>();
+  for (const r of todayRows) {
+    const key = labelForType(r.type);
+    byType.set(key, (byType.get(key) ?? 0) + 1);
+  }
+  const todayBreakdown = [...byType.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([k, v]) => `${v} ${k}${v === 1 ? "" : "s"}`)
+    .join(" · ");
+
+  // Streak only counts when today has activity.
+  let activeStreakDays = 0;
+  if (todayCount > 0) {
+    const activeDays = new Set(recent.map((r) => r.entry_date));
+    let d = new Date(`${today}T12:00:00Z`);
+    while (true) {
+      const key = d.toISOString().slice(0, 10);
+      if (!activeDays.has(key)) break;
+      activeStreakDays += 1;
+      d = new Date(d.getTime() - 24 * 60 * 60 * 1000);
+    }
+  }
+
+  return {
+    activeStreakDays,
+    todayCount,
+    todayBreakdown,
+  };
+}
+
 export type DistributionPerformanceRow = {
   platform: DistributionPlatform;
   label: string;

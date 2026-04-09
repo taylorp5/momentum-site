@@ -28,7 +28,7 @@ export function ProjectCard({
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="group block rounded-[10px] border border-zinc-200/90 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,box-shadow] hover:border-zinc-300/85 hover:shadow-[0_3px_10px_-4px_rgba(15,23,42,0.12)]"
+      className="group block rounded-[11px] border border-zinc-200/90 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,box-shadow,transform,background-color] hover:-translate-y-[1px] hover:border-zinc-300/90 hover:bg-zinc-50/[0.22] hover:shadow-[0_10px_22px_-14px_rgba(15,23,42,0.2)]"
     >
       <div className="flex flex-col sm:flex-row">
         <div
@@ -37,10 +37,10 @@ export function ProjectCard({
           aria-hidden
         />
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 p-0 sm:grid-cols-[1fr_auto]">
-          <div className="min-w-0 flex-1 space-y-2 px-4 py-3.5 sm:px-5">
+          <div className="min-w-0 flex-1 space-y-2.5 px-4 py-4 sm:px-5">
             <div className="flex flex-wrap items-center gap-2">
               <ProjectAvatar name={project.name} logoUrl={project.logo_url} size="sm" />
-              <h2 className="truncate text-[17px] font-semibold tracking-tight text-zinc-950">
+              <h2 className="truncate text-[19px] font-semibold tracking-tight text-zinc-950">
                 {project.name}
               </h2>
               <ProjectStatusBadge status={project.status} />
@@ -50,43 +50,43 @@ export function ProjectCard({
                 </span>
               ) : null}
             </div>
-            <p className="line-clamp-2 text-[14px] leading-relaxed text-zinc-600">
+            <p className="line-clamp-2 text-[14px] leading-relaxed text-zinc-700">
               {project.description ||
                 "Add a one-line pitch so future you knows what this is."}
             </p>
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-1">
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-zinc-500">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-zinc-600">
                 <span className="inline-flex items-center gap-1.5">
                   <StickyNote
-                    className="size-3.5 text-zinc-400"
+                    className="size-3.5 text-zinc-500"
                     strokeWidth={1.75}
                   />
-                  <span className="tabular-nums font-semibold text-zinc-800">
+                  <span className="tabular-nums font-semibold text-zinc-900">
                     {timelineCount}
                   </span>
                   <span>timeline</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Share2
-                    className="size-3.5 text-zinc-400"
+                    className="size-3.5 text-zinc-500"
                     strokeWidth={1.75}
                   />
-                  <span className="tabular-nums font-semibold text-zinc-800">
+                  <span className="tabular-nums font-semibold text-zinc-900">
                     {distributionCount}
                   </span>
                   <span>distribution</span>
                 </span>
               </div>
-              <span className="hidden text-zinc-300 sm:inline">·</span>
-              <span className="text-[12px] text-zinc-500">
+              <span className="hidden text-zinc-300 sm:inline">|</span>
+              <span className="text-[12.5px] text-zinc-600">
                 Started {started}
                 {totalSignals > 0 ? (
                   <>
-                    <span className="mx-1.5 text-zinc-300">·</span>
+                    <span className="mx-1.5 text-zinc-300">|</span>
                     {lastActivityAt ? (
                       <time
                         dateTime={lastActivityAt}
-                        className="font-medium text-zinc-600"
+                        className="font-semibold text-emerald-700"
                       >
                         Active{" "}
                         {formatDistanceToNow(new Date(lastActivityAt), {
@@ -97,7 +97,7 @@ export function ProjectCard({
                   </>
                 ) : (
                   <>
-                    <span className="mx-1.5 text-zinc-300">·</span>
+                    <span className="mx-1.5 text-zinc-300">|</span>
                     <span className="text-zinc-400">No entries yet</span>
                   </>
                 )}

@@ -56,7 +56,7 @@ export function SignupForm() {
     setSubmitting(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
       });
@@ -64,8 +64,15 @@ export function SignupForm() {
         toast.error(error.message);
         return;
       }
-      toast.success("Account created. Continue to your dashboard.");
-      router.push("/dashboard");
+      if (data.session) {
+        toast.success("Account created. Welcome to Momentum.");
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
+      toast.success("Check your email to confirm your account, then sign in.");
+      router.push("/login");
       router.refresh();
     } catch (e) {
       const misconfig = getSupabaseMisconfigurationMessage(e);

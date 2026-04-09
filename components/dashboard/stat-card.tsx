@@ -6,6 +6,8 @@ type StatCardProps = {
   value: string | number;
   hint?: string;
   className?: string;
+  titleClassName?: string;
+  valueClassName?: string;
   icon?: LucideIcon;
   tone?: "neutral" | "accent" | "success";
 };
@@ -15,6 +17,8 @@ export function StatCard({
   value,
   hint,
   className,
+  titleClassName,
+  valueClassName,
   icon: Icon,
   tone = "neutral",
 }: StatCardProps) {
@@ -28,7 +32,7 @@ export function StatCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.13em] text-zinc-500">
+        <p className={cn("text-[10px] font-medium uppercase tracking-[0.13em] text-zinc-500", titleClassName)}>
           {title}
         </p>
         {Icon ? (
@@ -47,7 +51,8 @@ export function StatCard({
         className={cn(
           "mt-2 tabular-nums text-[1.78rem] font-semibold leading-none tracking-tight text-zinc-950 sm:text-[1.95rem]",
           tone === "accent" && "text-blue-700",
-          tone === "success" && "text-emerald-700"
+          tone === "success" && "text-emerald-700",
+          valueClassName
         )}
       >
         {value}

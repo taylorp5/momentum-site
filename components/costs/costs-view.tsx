@@ -118,31 +118,35 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
   }
 
   const ledgerCard = (
-    <Card className="rounded-lg border-zinc-300/80 bg-white py-0 shadow-sm ring-1 ring-zinc-950/[0.04]">
-      <CardHeader className="border-b border-zinc-200/90 px-5 pb-3 pt-4">
+    <Card className="rounded-xl border-zinc-300/80 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.05)] ring-1 ring-zinc-950/[0.04] transition-colors hover:border-zinc-300">
+      <CardHeader className="border-b border-zinc-200/90 px-6 pb-4 pt-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
-            <CardTitle className="text-[15px] font-semibold tracking-tight text-zinc-950">
+            <CardTitle className="text-[18px] font-semibold tracking-tight text-zinc-950">
               Expense ledger
             </CardTitle>
-            <p className="text-[12px] leading-relaxed text-zinc-600">
-              Every spend line you have logged. Use filters for project, category,{" "}
-              <span className="font-medium text-zinc-700">recurring vs one-time</span>, and dates.
+            <p className="text-[14px] leading-relaxed text-zinc-600">
+              Every spend line tied to your projects. Filter by project, category, type, and date
+              to quickly understand where money is going.
             </p>
           </div>
           <LogEventDialog projects={projectModels} defaultEventType="cost">
             <Button
               variant="outline"
               size="sm"
-              className="h-8 shrink-0 rounded-md border-zinc-300 text-[12px] font-medium"
+              className="h-9 shrink-0 rounded-md border-zinc-300 text-[13px] font-medium"
             >
               Log expense
             </Button>
           </LogEventDialog>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 px-5 py-4">
-        <div className="grid gap-2 md:grid-cols-5">
+      <CardContent className="space-y-5 px-6 py-5">
+        <div className="space-y-3 rounded-xl border border-zinc-200/90 bg-zinc-50/60 p-4">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-zinc-600">
+            Filters
+          </p>
+          <div className="grid gap-3 md:grid-cols-5">
           <div className="md:col-span-2">
             <Label className="text-[11px] font-medium text-zinc-600">Search</Label>
             <div className="relative mt-1">
@@ -159,7 +163,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           <div>
             <Label className="text-[11px] font-medium text-zinc-600">Project</Label>
             <Select value={project} onValueChange={(v) => apply({ project: v ?? "all" })}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="mt-1 h-10">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent>
@@ -175,7 +179,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           <div>
             <Label className="text-[11px] font-medium text-zinc-600">Category</Label>
             <Select value={category} onValueChange={(v) => apply({ category: v ?? "all" })}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="mt-1 h-10">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -196,7 +200,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                 apply({ type: (v ?? "all") as "all" | "recurring" | "one_time" })
               }
             >
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="mt-1 h-10">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -206,14 +210,14 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div className="grid gap-2 md:grid-cols-5">
+          </div>
+          <div className="grid gap-3 md:grid-cols-5">
           <div className="md:col-span-2" />
           <div>
             <Label className="text-[11px] font-medium text-zinc-600">From</Label>
             <Input
               type="date"
-              className="mt-1"
+              className="mt-1 h-10"
               value={from}
               onChange={(e) => apply({ from: e.target.value })}
             />
@@ -222,7 +226,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
             <Label className="text-[11px] font-medium text-zinc-600">To</Label>
             <Input
               type="date"
-              className="mt-1"
+              className="mt-1 h-10"
               value={to}
               onChange={(e) => apply({ to: e.target.value })}
             />
@@ -230,7 +234,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           <div className="flex items-end">
             <Button
               variant="outline"
-              className="w-full"
+              className="h-10 w-full"
               onClick={() => {
                 setQuery("");
                 apply({ q: "", project: "all", category: "all", type: "all", from: "", to: "" });
@@ -239,25 +243,30 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
               Reset filters
             </Button>
           </div>
+          </div>
         </div>
 
         {rows.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-5">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-white text-zinc-600 ring-1 ring-zinc-200/80">
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-6 py-10 text-center">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-white text-zinc-600 ring-1 ring-zinc-200/80">
               <CreditCard className="size-5" strokeWidth={1.6} />
             </div>
-            <div>
-              <p className="text-[14px] font-semibold text-zinc-900">No expenses in this view</p>
-              <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-                Log an expense to build your ledger. Try widening filters if you expected rows here.
+            <div className="max-w-xl">
+              <p className="text-[20px] font-semibold tracking-tight text-zinc-900">
+                No expenses logged yet
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-zinc-600">
+                Track tools, subscriptions, ads, or anything you&apos;re spending to build your project.
               </p>
             </div>
             <LogEventDialog projects={projectModels} defaultEventType="cost">
-              <Button className="rounded-lg">Log expense</Button>
+              <Button className="h-10 rounded-lg px-5 text-[13px] font-semibold">
+                Log your first expense
+              </Button>
             </LogEventDialog>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-zinc-200/90">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200/90">
             <Table>
               <TableHeader>
                 <TableRow className="bg-zinc-50/90 hover:bg-zinc-50/90">
@@ -273,7 +282,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                 {rows.map((row) => (
                   <TableRow
                     key={row.id}
-                    className="cursor-pointer hover:bg-zinc-50/70"
+                    className="cursor-pointer transition-colors hover:bg-zinc-50"
                     onClick={() => router.push(`/projects/${row.project_id}?tab=timeline`)}
                   >
                     <TableCell className="text-zinc-600">
@@ -281,7 +290,9 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                     </TableCell>
                     <TableCell className="font-medium text-zinc-900">{row.project_name}</TableCell>
                     <TableCell className="capitalize text-zinc-700">
-                      {row.category ?? "uncategorized"}
+                      <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/80 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
+                        {row.category ?? "Uncategorized"}
+                      </span>
                     </TableCell>
                     <TableCell className="max-w-[420px] truncate text-zinc-600">
                       {row.description || row.title}
@@ -290,7 +301,15 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                       {money.format(row.amount)}
                     </TableCell>
                     <TableCell className="text-zinc-600">
-                      {row.is_recurring ? "Recurring" : "One-time"}
+                      <span
+                        className={
+                          row.is_recurring
+                            ? "inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                            : "inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800"
+                        }
+                      >
+                        {row.is_recurring ? "Recurring" : "One-time"}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -305,26 +324,28 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
   );
 
   const monthSnapshot = (
-    <section className="space-y-4">
-      <div className="border-b border-zinc-200/90 pb-2">
-        <h2 className="text-[13px] font-semibold text-zinc-900">This month at a glance</h2>
-        <p className="mt-0.5 text-[12px] text-zinc-500">
-          Quick totals from calendar-month expenses — same data as the ledger, rolled up.
+    <section className="space-y-5">
+      <div className="border-b border-zinc-200/90 pb-3">
+        <h2 className="text-[16px] font-semibold tracking-[0.02em] text-zinc-900">
+          This month at a glance
+        </h2>
+        <p className="mt-1 text-[14px] text-zinc-600">
+          Your spending snapshot this month, rolled up from the ledger.
         </p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
               Total spend this month
             </p>
-            <p className="mt-2 tabular-nums text-[1.5rem] font-semibold text-zinc-950">
+            <p className="mt-2 tabular-nums text-[2rem] font-semibold leading-none tracking-tight text-zinc-950">
               {money.format(summary.totalSpendThisMonth)}
             </p>
           </CardContent>
         </Card>
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
               Recurring subscriptions
             </p>
@@ -334,7 +355,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           </CardContent>
         </Card>
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
               One-time spend
             </p>
@@ -344,7 +365,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           </CardContent>
         </Card>
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
               Estimated take-home impact
             </p>
@@ -398,8 +419,8 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
         }
       />
       <div className="space-y-10">
-        {ledgerCard}
         {monthSnapshot}
+        {ledgerCard}
       </div>
     </div>
   );

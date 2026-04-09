@@ -12,10 +12,10 @@ export const dashSectionEyebrow =
   "text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500";
 
 export const dashSectionTitle =
-  "text-[13px] font-medium tracking-tight text-zinc-900";
+  "text-[16px] font-semibold tracking-[0.02em] text-zinc-900";
 
 export const dashSectionDesc =
-  "mt-1 text-[13px] font-normal leading-relaxed text-zinc-500";
+  "mt-1 text-[14px] font-normal leading-relaxed text-zinc-600";
 
 /** Growth / positive metrics (e.g. views). */
 export const dashMetricGrowth = "font-semibold tabular-nums text-blue-600";
