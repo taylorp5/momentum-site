@@ -1,6 +1,102 @@
 import { listTimelineByTypesSince } from "@/lib/data/timeline";
 import type { TimelineEntry } from "@/types/momentum";
 
+/** URL / UI range id. Free users are limited to `this_month` on the server. */
+export type FinancialRangeKey =
+  | "this_month"
+  | "last_month"
+  | "last_90_days"
+  | "ytd";
+
+const RANGE_KEYS: FinancialRangeKey[] = [
+  "this_month",
+  "last_month",
+  "last_90_days",
+  "ytd",
+];
+
+export function parseFinancialRangeParam(
+  raw: string | string[] | undefined
+): FinancialRangeKey {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (!v || typeof v !== "string") return "this_month";
+  const n = v.trim().toLowerCase().replace(/-/g, "_");
+  return RANGE_KEYS.includes(n as FinancialRangeKey)
+    ? (n as FinancialRangeKey)
+    : "this_month";
+}
+
+function utcTodayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function monthStartIsoUtc(year: number, monthIndex0: number): string {
+  const d = new Date(Date.UTC(year, monthIndex0, 1));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Inclusive end date for a calendar month (UTC). */
+function lastDayOfMonthUtc(year: number, monthIndex0: number): string {
+  const d = new Date(Date.UTC(year, monthIndex0 + 1, 0));
+  return d.toISOString().slice(0, 10);
+}
+
+export function financialRangeBounds(
+  key: FinancialRangeKey
+): { sinceDate: string; untilDate: string; periodLabel: string } {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const today = utcTodayIso();
+
+  switch (key) {
+    case "this_month": {
+      const sinceDate = monthStartIsoUtc(y, m);
+      const start = new Date(Date.UTC(y, m, 1));
+      const periodLabel = start.toLocaleString("en-US", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      return { sinceDate, untilDate: today, periodLabel };
+    }
+    case "last_month": {
+      const ly = m === 0 ? y - 1 : y;
+      const lm = m === 0 ? 11 : m - 1;
+      const sinceDate = monthStartIsoUtc(ly, lm);
+      const untilDate = lastDayOfMonthUtc(ly, lm);
+      const start = new Date(Date.UTC(ly, lm, 1));
+      const periodLabel = start.toLocaleString("en-US", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      return { sinceDate, untilDate, periodLabel };
+    }
+    case "last_90_days": {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - 90);
+      return {
+        sinceDate: d.toISOString().slice(0, 10),
+        untilDate: today,
+        periodLabel: "Last 90 days",
+      };
+    }
+    case "ytd": {
+      const sinceDate = monthStartIsoUtc(y, 0);
+      return {
+        sinceDate,
+        untilDate: today,
+        periodLabel: `${y} year to date`,
+      };
+    }
+    default: {
+      const _x: never = key;
+      return _x;
+    }
+  }
+}
+
 export type FinancialDealRow = {
   id: string;
   partnerName: string;
@@ -28,22 +124,6 @@ export type FinancialIntelligenceSnapshot = {
   /** True when sum of deal percentages exceeds 100% before capping. */
   shareRatesCapped: boolean;
 };
-
-function monthStartIso(): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return d.toISOString().slice(0, 10);
-}
-
-function periodLabelUtc(): string {
-  const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return monthStart.toLocaleString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 function buildInsight(
   hasActivity: boolean,
@@ -82,17 +162,19 @@ function aggregateByKey(
 }
 
 /**
- * Financial snapshot for the current UTC calendar month from timeline revenue, cost, and deal events.
+ * Financial snapshot from timeline revenue, cost, and deal events for the given range.
  * Revenue share: sum of all deal `revenue_share_percentage` values, capped at 100%, applied to gross revenue.
  */
 export async function getFinancialIntelligenceSnapshot(
-  userId: string
+  userId: string,
+  rangeKey: FinancialRangeKey = "this_month"
 ): Promise<FinancialIntelligenceSnapshot> {
-  const sinceDate = monthStartIso();
+  const { sinceDate, untilDate, periodLabel } = financialRangeBounds(rangeKey);
   const rows = await listTimelineByTypesSince(
     userId,
     ["revenue", "cost", "deal"],
-    sinceDate
+    sinceDate,
+    untilDate
   );
 
   const revenueRows = rows.filter((r) => r.type === "revenue");
@@ -137,7 +219,7 @@ export async function getFinancialIntelligenceSnapshot(
   });
 
   return {
-    periodLabel: periodLabelUtc(),
+    periodLabel,
     sinceDate,
     grossRevenue,
     totalCosts,

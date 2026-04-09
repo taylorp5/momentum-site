@@ -128,7 +128,8 @@ export async function signTimelineImageUrl(
 export async function listTimelineByTypesSince(
   userId: string,
   types: TimelineEntry["type"][],
-  sinceDate: string
+  sinceDate: string,
+  untilDate?: string | null
 ): Promise<TimelineEntry[]> {
   if (types.length === 0) return [];
   if (isMockDataMode()) {
@@ -137,7 +138,8 @@ export async function listTimelineByTypesSince(
         (e) =>
           e.user_id === userId &&
           types.includes(e.type) &&
-          e.entry_date >= sinceDate
+          e.entry_date >= sinceDate &&
+          (!untilDate || e.entry_date <= untilDate)
       )
       .sort(
         (a, b) =>
@@ -152,12 +154,16 @@ export async function listTimelineByTypesSince(
   const ids = await listProjectIds(userId);
   if (ids.length === 0) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("timeline_entries")
     .select(timelineRow)
     .in("project_id", ids)
     .in("type", types)
-    .gte("entry_date", sinceDate)
+    .gte("entry_date", sinceDate);
+  if (untilDate?.trim()) {
+    query = query.lte("entry_date", untilDate.trim());
+  }
+  const { data, error } = await query
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(500);

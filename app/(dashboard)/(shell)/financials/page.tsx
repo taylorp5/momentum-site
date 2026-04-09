@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { FinancialIntelligenceView } from "@/components/financials/financial-intelligence-view";
 import { getProfile, requireSessionUser } from "@/lib/auth/user";
-import { getFinancialIntelligenceSnapshot } from "@/lib/data/financial-intelligence";
+import {
+  getFinancialIntelligenceSnapshot,
+  parseFinancialRangeParam,
+} from "@/lib/data/financial-intelligence";
 import { isProPlan } from "@/lib/plan";
 
 export const metadata: Metadata = {
@@ -9,15 +13,29 @@ export const metadata: Metadata = {
   description: "Earnings, spending, and net income across your projects.",
 };
 
-export default async function FinancialsPage() {
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function FinancialsPage({ searchParams }: PageProps) {
   const user = await requireSessionUser();
-  const [profile, snapshot] = await Promise.all([
-    getProfile(user.id),
-    getFinancialIntelligenceSnapshot(user.id),
-  ]);
+  const raw = await searchParams;
+  const profile = await getProfile(user.id);
   const isPro = isProPlan(profile?.plan ?? "free");
+  const requested = parseFinancialRangeParam(raw.range);
+
+  if (!isPro && requested !== "this_month") {
+    redirect("/financials");
+  }
+
+  const activeRange = !isPro ? "this_month" : requested;
+  const snapshot = await getFinancialIntelligenceSnapshot(user.id, activeRange);
 
   return (
-    <FinancialIntelligenceView isPro={isPro} snapshot={snapshot} />
+    <FinancialIntelligenceView
+      snapshot={snapshot}
+      activeRange={activeRange}
+      canCustomizeDateRange={isPro}
+    />
   );
 }

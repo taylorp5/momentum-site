@@ -8,8 +8,10 @@ import {
   Handshake,
   Info,
   Layers,
+  Lock,
 } from "lucide-react";
 import { ProAnalyticsGate } from "@/components/billing/pro-analytics-gate";
+import { usePlan } from "@/components/billing/plan-context";
 import {
   dashCard,
   dashCardHeader,
@@ -18,8 +20,12 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { FinancialIntelligenceSnapshot } from "@/lib/data/financial-intelligence";
+import type {
+  FinancialIntelligenceSnapshot,
+  FinancialRangeKey,
+} from "@/lib/data/financial-intelligence";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -27,9 +33,18 @@ const money = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const RANGE_OPTIONS: { id: FinancialRangeKey; label: string }[] = [
+  { id: "this_month", label: "This month" },
+  { id: "last_month", label: "Last month" },
+  { id: "last_90_days", label: "Last 90 days" },
+  { id: "ytd", label: "Year to date" },
+];
+
 type Props = {
-  isPro: boolean;
   snapshot: FinancialIntelligenceSnapshot;
+  activeRange: FinancialRangeKey;
+  /** Server plan: custom ranges only when true (RevenueCat-only Pro still sees locked ranges until profile updates). */
+  canCustomizeDateRange: boolean;
 };
 
 type InsightBlock = {
@@ -93,18 +108,20 @@ function NetIncomeHero({
   hasActivity,
   grossRevenue,
   totalCosts,
+  periodLabel,
 }: {
   net: number;
   hasActivity: boolean;
   grossRevenue: number;
   totalCosts: number;
+  periodLabel: string;
 }) {
   const positive = net > 0;
   const negative = net < 0;
 
   const contextLine = !hasActivity
-    ? "This month so far — add revenue or expenses to see your numbers."
-    : `This month so far: ${money.format(grossRevenue)} revenue and ${money.format(totalCosts)} in costs.`;
+    ? `${periodLabel} — add revenue or expenses to see your numbers.`
+    : `${periodLabel}: ${money.format(grossRevenue)} revenue and ${money.format(totalCosts)} in costs.`;
 
   const statusLine = !hasActivity
     ? "No activity yet"
@@ -119,11 +136,11 @@ function NetIncomeHero({
   const simpleInsight = !hasActivity
     ? "No activity yet — log your first revenue or expense."
     : grossRevenue === 0 && totalCosts > 0
-      ? `You've spent ${money.format(totalCosts)} and earned ${money.format(0)} this month.`
+      ? `You've spent ${money.format(totalCosts)} and earned ${money.format(0)} in this period.`
       : positive
         ? "Revenue is covering your costs."
         : negative
-          ? `You've spent ${money.format(totalCosts)} and earned ${money.format(grossRevenue)} this month.`
+          ? `You've spent ${money.format(totalCosts)} and earned ${money.format(grossRevenue)} in this period.`
           : "You're close to breaking even.";
 
   return (
@@ -352,7 +369,12 @@ function BreakdownBars({
   );
 }
 
-export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
+export function FinancialIntelligenceView({
+  snapshot,
+  activeRange,
+  canCustomizeDateRange,
+}: Props) {
+  const { isPro, openUpgrade } = usePlan();
   const s = snapshot;
   const insight = dashboardInsight(s);
 
@@ -451,11 +473,68 @@ export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
         }
       />
 
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+          Date range
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {RANGE_OPTIONS.map((opt) => {
+            const selected = opt.id === activeRange;
+            const locked = !canCustomizeDateRange && opt.id !== "this_month";
+            if (locked) {
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    toast.message("Custom date ranges are a Pro feature", {
+                      description: "Upgrade to analyze last month, 90 days, or year to date.",
+                    });
+                    openUpgrade();
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                    "border-dashed border-zinc-300/90 bg-zinc-50/60 text-zinc-500 hover:border-zinc-400/80 hover:bg-zinc-100/80 hover:text-zinc-700"
+                  )}
+                >
+                  <Lock className="size-3 shrink-0 opacity-50" strokeWidth={1.75} aria-hidden />
+                  {opt.label}
+                </button>
+              );
+            }
+            const href =
+              opt.id === "this_month" ? "/financials" : `/financials?range=${opt.id}`;
+            return (
+              <Link
+                key={opt.id}
+                href={href}
+                scroll={false}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-medium no-underline transition-colors",
+                  selected
+                    ? "border-zinc-900 bg-zinc-900 text-white"
+                    : "border-zinc-200/90 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                )}
+              >
+                {opt.label}
+              </Link>
+            );
+          })}
+        </div>
+        {!canCustomizeDateRange ? (
+          <p className="text-[11px] text-zinc-500">
+            Free plan uses <span className="font-medium text-zinc-700">This month</span>. Pro unlocks
+            more ranges.
+          </p>
+        ) : null}
+      </div>
+
       <NetIncomeHero
         net={s.netIncome}
         hasActivity={s.hasActivity}
         grossRevenue={s.grossRevenue}
         totalCosts={s.totalCosts}
+        periodLabel={s.periodLabel}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -488,11 +567,26 @@ export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
         />
       </div>
 
-      <InsightCard
-        block={insight}
-        showActions={showInsightActions}
-        hasActivity={s.hasActivity}
-      />
+      <section className="space-y-4 border-t border-zinc-200/60 pt-10">
+        <div className="flex items-center gap-2 text-zinc-500">
+          <Info className="size-4" strokeWidth={1.65} />
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            Insights
+          </h2>
+        </div>
+        <ProAnalyticsGate
+          isPro={isPro}
+          overlayTitle="Financial insights"
+          overlayDescription="A clearer read on profitability, spend, and what to do next."
+          ctaLabel="Upgrade to Pro"
+        >
+          <InsightCard
+            block={insight}
+            showActions={showInsightActions}
+            hasActivity={s.hasActivity}
+          />
+        </ProAnalyticsGate>
+      </section>
 
       <section className="space-y-5 border-t border-zinc-200/60 pt-10">
         <div className="flex items-center gap-2 text-zinc-500">
@@ -503,8 +597,8 @@ export function FinancialIntelligenceView({ isPro, snapshot }: Props) {
         </div>
         <ProAnalyticsGate
           isPro={isPro}
-          overlayTitle="Unlock breakdowns"
-          overlayDescription="See revenue by source, costs by category, and partner share."
+          overlayTitle="Detailed breakdowns"
+          overlayDescription="Upgrade to see detailed breakdowns."
           ctaLabel="Upgrade to Pro"
         >
           {breakdownInner}

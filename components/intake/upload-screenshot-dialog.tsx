@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -68,6 +68,7 @@ function projectDisplayName(p: Project | undefined): string {
 
 export function UploadScreenshotDialog({ projects }: Props) {
   const { isPro, openUpgrade } = usePlan();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<IntakeKind>("auto");
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
@@ -288,15 +289,38 @@ export function UploadScreenshotDialog({ projects }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Screenshot</Label>
-              <Input
+              <Label htmlFor="screenshot-upload-input">Screenshot</Label>
+              <input
+                ref={fileInputRef}
+                id="screenshot-upload-input"
                 type="file"
                 accept={TIMELINE_SNAPSHOT_ACCEPT}
+                className="sr-only"
                 onChange={(e) => {
                   setFile(e.target.files?.[0] ?? null);
                   setDetected(null);
                 }}
               />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 shrink-0 gap-2 rounded-lg border-zinc-300 bg-white px-4 text-[13px] font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="size-4" strokeWidth={1.75} />
+                  Choose file
+                </Button>
+                <div className="flex min-h-10 flex-1 items-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-2">
+                  <p className="truncate text-[13px] text-zinc-600">
+                    {file ? (
+                      <span className="font-medium text-zinc-900">{file.name}</span>
+                    ) : (
+                      <span className="text-zinc-500">No file selected — PNG, JPG, or WebP</span>
+                    )}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {processing ? (
