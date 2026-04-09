@@ -2,7 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
-import { costRecurringContextLine } from "@/lib/cost-recurrence";
+import {
+  costRecurringContextLine,
+  localCalendarTodayIso,
+} from "@/lib/cost-recurrence";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -71,7 +74,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => localCalendarTodayIso(), []);
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const project = searchParams.get("project") ?? "all";
