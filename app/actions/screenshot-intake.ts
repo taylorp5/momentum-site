@@ -52,31 +52,6 @@ const applyScreenshotIntakeSchema = z.object({
     .optional(),
 });
 
-function screenshotDetectedHasAiFields(
-  detected:
-    | {
-        platform?: DistributionPlatform;
-        views?: number;
-        likes?: number;
-        comments?: number;
-        amount?: number;
-        category?: string;
-        revenueSource?: string;
-      }
-    | undefined
-): boolean {
-  if (!detected) return false;
-  return (
-    detected.views != null ||
-    detected.likes != null ||
-    detected.comments != null ||
-    detected.amount != null ||
-    Boolean(detected.category?.trim()) ||
-    Boolean(detected.revenueSource?.trim()) ||
-    detected.platform != null
-  );
-}
-
 export async function applyScreenshotIntakeAction(
   input: unknown
 ): Promise<ActionResult> {
@@ -87,16 +62,14 @@ export async function applyScreenshotIntakeAction(
   const parsed = applyScreenshotIntakeSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const d = parsed.data;
-  if (screenshotDetectedHasAiFields(d.detected)) {
-    const profile = await getProfile(user.id);
-    if (!isProPlan(profile?.plan ?? "free")) {
-      return {
-        error:
-          "AI auto-fill from screenshots is a Pro feature. Continue manually or upgrade.",
-      };
-    }
+  const profile = await getProfile(user.id);
+  if (!isProPlan(profile?.plan ?? "free")) {
+    return {
+      error: "Screenshot upload is a Pro feature. Upgrade to unlock.",
+    };
   }
+
+  const d = parsed.data;
   const notes = d.notes?.trim() || "";
   const source = d.source_label?.trim() || "Screenshot intake";
 

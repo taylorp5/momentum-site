@@ -74,7 +74,6 @@ export function UploadScreenshotDialog({ projects }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [detected, setDetected] = useState<DetectionResult | null>(null);
-  const [manualMode, setManualMode] = useState(false);
   const [destination, setDestination] = useState<IntakeDestination>("timeline");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -107,14 +106,19 @@ export function UploadScreenshotDialog({ projects }: Props) {
   function resetFormState() {
     setFile(null);
     setDetected(null);
-    setManualMode(false);
     setNotes("");
   }
 
   async function onApply() {
+    if (!isPro) {
+      toast.message("Screenshot upload is a Pro feature", {
+        description: "Upgrade to turn screenshots into structured entries.",
+      });
+      openUpgrade();
+      return;
+    }
     if (!file || !projectId) return;
-    if (isPro && !detected) return;
-    if (!isPro && !manualMode) return;
+    if (!detected) return;
     if (!isSupabaseConfigured()) {
       toast.error("Supabase is required for uploads.");
       return;
@@ -143,25 +147,22 @@ export function UploadScreenshotDialog({ projects }: Props) {
         return;
       }
 
-      const useAi = isPro && Boolean(detected);
       const res = await applyScreenshotIntakeAction({
         project_id: projectId,
         destination,
         entry_date: new Date().toISOString().slice(0, 10),
         image_storage_path: path,
-        source_label: useAi ? detected!.source : "Screenshot (manual)",
+        source_label: detected.source,
         notes,
-        detected: useAi
-          ? {
-              platform: detected!.platform,
-              views: detected!.views,
-              likes: detected!.likes,
-              comments: detected!.comments,
-              amount: detected!.amount,
-              category: detected!.category,
-              revenueSource: detected!.revenueSource,
-            }
-          : undefined,
+        detected: {
+          platform: detected.platform,
+          views: detected.views,
+          likes: detected.likes,
+          comments: detected.comments,
+          amount: detected.amount,
+          category: detected.category,
+          revenueSource: detected.revenueSource,
+        },
       });
       if ("error" in res) {
         toast.error(res.error);
@@ -177,7 +178,21 @@ export function UploadScreenshotDialog({ projects }: Props) {
 
   return (
     <>
-      <Button className="h-8 rounded-lg px-3 text-[12px]" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        className="h-8 rounded-lg px-3 text-[12px]"
+        title={!isPro ? "Upgrade to Pro to upload screenshots" : undefined}
+        onClick={() => {
+          if (!isPro) {
+            toast.message("Screenshot upload is a Pro feature", {
+              description: "Upgrade to auto-organize screenshots into Momentum.",
+            });
+            openUpgrade();
+            return;
+          }
+          setOpen(true);
+        }}
+      >
         <Upload className="mr-1.5 size-3.5" /> Upload screenshot
       </Button>
       <Dialog
@@ -244,7 +259,6 @@ export function UploadScreenshotDialog({ projects }: Props) {
                       onClick={() => {
                         setKind(k.id);
                         setDetected(null);
-                        setManualMode(false);
                       }}
                       className={cn(
                         "flex w-full min-w-0 items-start gap-3 rounded-xl border px-3 py-3 text-left transition-[border-color,background-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -281,7 +295,6 @@ export function UploadScreenshotDialog({ projects }: Props) {
                 onChange={(e) => {
                   setFile(e.target.files?.[0] ?? null);
                   setDetected(null);
-                  setManualMode(false);
                 }}
               />
             </div>
@@ -294,7 +307,7 @@ export function UploadScreenshotDialog({ projects }: Props) {
               </div>
             ) : null}
 
-            {detected && isPro ? (
+            {detected ? (
               <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50/60 p-4">
                 <div>
                   <p className="text-[12px] uppercase tracking-[0.12em] text-zinc-500">Detected from screenshot</p>
@@ -329,70 +342,13 @@ export function UploadScreenshotDialog({ projects }: Props) {
               </div>
             ) : null}
 
-            {!isPro && manualMode && !detected ? (
-              <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50/40 p-4">
-                <p className="text-[13px] leading-relaxed text-zinc-600">
-                  Choose where this screenshot belongs and add a short note if you like. Metrics stay manual on the free plan.
-                </p>
-                <div className="space-y-2">
-                  <Label>Where should this go?</Label>
-                  <Select value={destination} onValueChange={(v) => setDestination(v as IntakeDestination)}>
-                    <SelectTrigger className="h-auto min-h-9 w-full max-w-full py-2 text-left whitespace-normal [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:whitespace-normal [&_[data-slot=select-value]]:text-left">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent align="start" alignItemWithTrigger={false} sideOffset={6}>
-                      {DESTINATIONS.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add context before applying" />
-                </div>
-              </div>
-            ) : null}
-
             <div className="flex flex-wrap justify-end gap-2">
-              {isPro && !detected && !processing ? (
+              {!detected && !processing ? (
                 <Button onClick={runDetection} disabled={!file || processing}>
                   Continue
                 </Button>
               ) : null}
-              {!isPro && file && !detected && !manualMode ? (
-                <>
-                  <Button type="button" variant="outline" onClick={openUpgrade}>
-                    Try AI (Pro)
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setManualMode(true);
-                      setDestination("timeline");
-                    }}
-                    disabled={!file}
-                  >
-                    Continue manually
-                  </Button>
-                </>
-              ) : null}
-              {!isPro && manualMode && !detected ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-zinc-600"
-                    onClick={() => setManualMode(false)}
-                  >
-                    Back
-                  </Button>
-                  <Button onClick={() => void onApply()} disabled={saving || !file}>
-                    {saving ? "Applying..." : "Confirm and apply"}
-                  </Button>
-                </>
-              ) : null}
-              {isPro && detected ? (
+              {detected ? (
                 <Button onClick={() => void onApply()} disabled={saving}>
                   {saving ? "Applying..." : "Confirm and apply"}
                 </Button>
