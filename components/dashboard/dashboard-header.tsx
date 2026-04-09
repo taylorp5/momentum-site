@@ -138,6 +138,18 @@ export function DashboardHeader({
     return `${h}:${m}:${s}`;
   }, [runningSession, now]);
 
+  const sessionProjectOptions = useMemo(
+    () =>
+      projects.map((project) => ({
+        value: project.id,
+        label: project.name?.trim() || "Untitled project",
+      })),
+    [projects]
+  );
+  const selectedSessionProjectLabel =
+    sessionProjectOptions.find((option) => option.value === sessionProjectId)?.label ??
+    "";
+
   async function onStartSession() {
     if (!sessionProjectId) {
       toast.error("Choose a project to start a build session.");
@@ -358,12 +370,14 @@ export function DashboardHeader({
                 onValueChange={(v) => setSessionProjectId(v ?? "")}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose project" />
+                  <SelectValue placeholder="Choose project">
+                    {selectedSessionProjectLabel || "Choose project"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
+                  {sessionProjectOptions.map((project) => (
+                    <SelectItem key={project.value} value={project.value}>
+                      {project.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

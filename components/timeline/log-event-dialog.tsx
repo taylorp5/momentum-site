@@ -7,14 +7,13 @@ import {
   Brain,
   Hammer,
   Handshake,
-  Loader2,
   Megaphone,
+  Plus,
+  Trash2,
   Wallet,
   WalletCards,
 } from "lucide-react";
-import { listContentGroupsAction } from "@/app/actions/content-groups";
 import { createLogEventAction } from "@/app/actions/timeline";
-import { usePlan } from "@/components/billing/plan-context";
 import {
   DISTRIBUTION_PLATFORM_LABELS,
   TIMELINE_BUCKET,
@@ -39,7 +38,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { DialogTriggerMerge } from "@/components/ui/dialog-trigger-merge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,20 +75,38 @@ type FormValues = {
   partner_name: string;
   revenue_share_percentage: string;
   dist_views: string;
-  dist_likes: string;
-  dist_comments: string;
   cost_type: "one_time" | "recurring";
   recurrence_option: "monthly" | "yearly" | "quarterly" | "custom";
   recurrence_label: string;
   linked_distribution_entry_id: string;
   dist_subreddit: string;
-  cross_post_track: boolean;
-  cross_post_attach: "new" | "existing";
-  content_group_existing_id: string;
-  new_content_group_title: string;
-  new_content_group_description: string;
   build_kind: BuildProgressKind;
 };
+
+type DistributionPlatformEntry = {
+  id: string;
+  platform: DistributionPlatform;
+  subreddit: string;
+  url: string;
+  views: string;
+  notes: string;
+  entry_date: string;
+};
+
+function makeDistributionEntry(
+  date: string,
+  platform: DistributionPlatform = "reddit"
+): DistributionPlatformEntry {
+  return {
+    id: crypto.randomUUID(),
+    platform,
+    subreddit: "",
+    url: "",
+    views: "",
+    notes: "",
+    entry_date: date,
+  };
+}
 
 function buildLogPayload(
   values: FormValues,
@@ -118,23 +134,16 @@ function buildLogPayload(
       const u = z.string().url().safeParse(rawUrl);
       if (!u.success) return { error: "Enter a valid URL for the post." };
       const views = parseOptionalInt(values.dist_views);
-      const likes = parseOptionalInt(values.dist_likes);
-      const comments = parseOptionalInt(values.dist_comments);
-      if (views === null || likes === null || comments === null) {
+      if (views === null) {
         return { error: "Performance fields must be non-negative numbers." };
       }
       const metrics =
-        views !== undefined || likes !== undefined || comments !== undefined
+        views !== undefined
           ? {
               ...(views !== undefined ? { views } : {}),
-              ...(likes !== undefined ? { likes } : {}),
-              ...(comments !== undefined ? { comments } : {}),
             }
           : undefined;
       const subRaw = values.dist_subreddit?.trim() ?? "";
-      const cross = Boolean(values.cross_post_track);
-      const attachNew = values.cross_post_attach === "new";
-      const existingId = values.content_group_existing_id?.trim() ?? "";
       return {
         type: "distribution",
         project_id: values.project_id,
@@ -146,16 +155,6 @@ function buildLogPayload(
         image_storage_path: imagePath,
         metrics,
         subreddit: values.platform === "reddit" && subRaw ? subRaw : null,
-        content_group_id:
-          cross && !attachNew && existingId && z.string().uuid().safeParse(existingId).success
-            ? existingId
-            : null,
-        new_content_group_title:
-          cross && attachNew ? values.new_content_group_title?.trim() || null : null,
-        new_content_group_description:
-          cross && attachNew
-            ? values.new_content_group_description?.trim() || null
-            : null,
       };
     }
     case "build": {
@@ -425,10 +424,8 @@ export function LogEventDialog({
   };
   const [pending, setPending] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [screenshotProcessing, setScreenshotProcessing] = useState(false);
-  const { isPro, openUpgrade } = usePlan();
-  const [contentGroupOptions, setContentGroupOptions] = useState<
-    { id: string; title: string }[]
+  const [distributionEntries, setDistributionEntries] = useState<
+    DistributionPlatformEntry[]
   >([]);
   const platformTriggerRef = useRef<HTMLButtonElement | null>(null);
   const postUrlInputRef = useRef<HTMLInputElement | null>(null);
@@ -452,18 +449,11 @@ export function LogEventDialog({
       partner_name: "",
       revenue_share_percentage: "",
       dist_views: "",
-      dist_likes: "",
-      dist_comments: "",
       cost_type: "one_time",
       recurrence_option: "monthly",
       recurrence_label: "",
       linked_distribution_entry_id: "",
       dist_subreddit: "",
-      cross_post_track: false,
-      cross_post_attach: "new",
-      content_group_existing_id: "",
-      new_content_group_title: "",
-      new_content_group_description: "",
       build_kind: "progress",
     },
   });
@@ -498,11 +488,6 @@ export function LogEventDialog({
   const effectiveType = isContextLocked ? defaultEventType! : type;
   const isDistributionFlow = effectiveType === "distribution";
   const distQuick = Boolean(distributionQuickMode) && isDistributionFlow;
-  const distUrlField = form.register("url");
-  const distUrl = form.watch("url");
-  const distPlatform = (form.watch("platform") ?? "reddit") as DistributionPlatform;
-  const crossPostTrack = form.watch("cross_post_track");
-  const crossPostAttach = form.watch("cross_post_attach");
   const showProjectSelect =
     !fixedProjectId && (projects?.length ?? 0) > 1;
   const selectedProjectId = form.watch("project_id") || "";
@@ -518,12 +503,6 @@ export function LogEventDialog({
     if (!open) return;
     setFile(null);
   }, [type, open]);
-
-  useEffect(() => {
-    if (!open || !isDistributionFlow) return;
-    const detected = detectPlatformFromUrl(distUrl);
-    if (detected) form.setValue("platform", detected);
-  }, [distUrl, open, isDistributionFlow, form]);
 
   useEffect(() => {
     if (!open || !isDistributionFlow) return;
@@ -546,34 +525,33 @@ export function LogEventDialog({
   ]);
 
   useEffect(() => {
-    if (!open || !isDistributionFlow || !isPro || !crossPostTrack) {
-      return;
-    }
-    let cancelled = false;
-    void listContentGroupsAction().then((res) => {
-      if (cancelled) return;
-      if ("success" in res && res.success) {
-        setContentGroupOptions(res.groups);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, isDistributionFlow, isPro, crossPostTrack]);
+    if (!open || !isDistributionFlow) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const firstPlatform = defaultDistributionPlatform ?? "reddit";
+    setDistributionEntries([makeDistributionEntry(day, firstPlatform)]);
+  }, [open, isDistributionFlow, defaultDistributionPlatform]);
 
-  useEffect(() => {
-    if (!open || !isDistributionFlow) {
-      setScreenshotProcessing(false);
-      return;
-    }
-    if (!file) {
-      setScreenshotProcessing(false);
-      return;
-    }
-    setScreenshotProcessing(true);
-    const t = window.setTimeout(() => setScreenshotProcessing(false), 1600);
-    return () => window.clearTimeout(t);
-  }, [file, open, isDistributionFlow]);
+  const updateDistributionEntry = (
+    id: string,
+    patch: Partial<DistributionPlatformEntry>
+  ) => {
+    setDistributionEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))
+    );
+  };
+
+  const addDistributionEntry = () => {
+    setDistributionEntries((prev) => [
+      ...prev,
+      makeDistributionEntry(new Date().toISOString().slice(0, 10), "other"),
+    ]);
+  };
+
+  const removeDistributionEntry = (id: string) => {
+    setDistributionEntries((prev) =>
+      prev.length > 1 ? prev.filter((entry) => entry.id !== id) : prev
+    );
+  };
 
   async function onSubmit(values: FormValues) {
     setPending(true);
@@ -598,11 +576,114 @@ export function LogEventDialog({
         toast.error("Choose a project before logging a post.");
         return;
       }
+      if (submitType === "distribution") {
+        const title = values.title.trim();
+        const globalNotes = values.description.trim();
+        const nonEmptyEntries = distributionEntries.filter(
+          (entry) =>
+            entry.url.trim() ||
+            entry.views.trim() ||
+            entry.notes.trim() ||
+            entry.subreddit.trim()
+        );
+        if (nonEmptyEntries.length === 0) {
+          toast.error("Add at least one platform entry.");
+          return;
+        }
+
+        const payloads: LogEventInput[] = [];
+        for (const entry of nonEmptyEntries) {
+          const parsedUrl = z.string().url().safeParse(entry.url.trim());
+          if (!parsedUrl.success) {
+            toast.error("Each platform entry needs a valid link.");
+            return;
+          }
+          const rawViews = entry.views.trim();
+          const parsedViews: number | null =
+            rawViews.length === 0 ? null : Number.parseInt(rawViews, 10);
+          if (
+            parsedViews !== null &&
+            (!Number.isFinite(parsedViews) || parsedViews < 0)
+          ) {
+            toast.error("Views must be a non-negative number.");
+            return;
+          }
+          const combinedNotes = [globalNotes, entry.notes.trim()]
+            .filter(Boolean)
+            .join("\n\n");
+
+          payloads.push({
+            type: "distribution",
+            project_id: projectIdForSubmit,
+            entry_date: entry.entry_date || new Date().toISOString().slice(0, 10),
+            platform: entry.platform,
+            title: title || null,
+            notes: combinedNotes,
+            url: parsedUrl.data,
+            image_storage_path: null,
+            metrics: parsedViews === null ? undefined : { views: parsedViews },
+            subreddit:
+              entry.platform === "reddit" && entry.subreddit.trim()
+                ? entry.subreddit.trim()
+                : null,
+            content_group_id: null,
+            new_content_group_title: null,
+            new_content_group_description: null,
+          });
+        }
+
+        for (const payload of payloads) {
+          const res = await createLogEventAction(payload);
+          if ("error" in res) {
+            toast.error(res.error);
+            return;
+          }
+        }
+
+        toast.success(
+          payloads.length === 1
+            ? "Distribution logged"
+            : `${payloads.length} distribution entries logged`,
+          {
+            description: "Timeline and distribution views will update on refresh.",
+            duration: 4000,
+          }
+        );
+        setOpen(false);
+        form.reset({
+          project_id: fixedProjectId ?? projects?.[0]?.id ?? "",
+          type: defaultEventType ?? defaultType,
+          entry_date: new Date().toISOString().slice(0, 10),
+          title: "",
+          description: "",
+          external_url: "",
+          url: "",
+          platform: "reddit",
+          image_storage_path: null,
+          amount: "",
+          category: "",
+          revenue_source: "",
+          partner_name: "",
+          revenue_share_percentage: "",
+          dist_views: "",
+          cost_type: "one_time",
+          recurrence_option: "monthly",
+          recurrence_label: "",
+          linked_distribution_entry_id: "",
+          dist_subreddit: "",
+          build_kind: "progress",
+        });
+        setDistributionEntries([
+          makeDistributionEntry(new Date().toISOString().slice(0, 10), "reddit"),
+        ]);
+        setFile(null);
+        router.refresh();
+        return;
+      }
       if (
         submitType === "snapshot" ||
         submitType === "build" ||
-        submitType === "experiment" ||
-        submitType === "distribution"
+        submitType === "experiment"
       ) {
         if (file) {
           if (file.size > TIMELINE_SNAPSHOT_MAX_BYTES) {
@@ -659,18 +740,10 @@ export function LogEventDialog({
         toast.error(res.error);
         return;
       }
-      toast.success(
-        submitType === "distribution"
-          ? "Post logged — momentum updated"
-          : "Event saved",
-        {
-          description:
-            submitType === "distribution"
-              ? "Dashboard and insights will refresh on the next view."
-              : "Your timeline is updated.",
-          duration: 4000,
-        }
-      );
+      toast.success("Event saved", {
+        description: "Your timeline is updated.",
+        duration: 4000,
+      });
       setOpen(false);
       form.reset({
         project_id: fixedProjectId ?? projects?.[0]?.id ?? "",
@@ -688,18 +761,11 @@ export function LogEventDialog({
         partner_name: "",
         revenue_share_percentage: "",
         dist_views: "",
-        dist_likes: "",
-        dist_comments: "",
         cost_type: "one_time",
         recurrence_option: "monthly",
         recurrence_label: "",
         linked_distribution_entry_id: "",
         dist_subreddit: "",
-        cross_post_track: false,
-        cross_post_attach: "new",
-        content_group_existing_id: "",
-        new_content_group_title: "",
-        new_content_group_description: "",
         build_kind: "progress",
       });
       setFile(null);
@@ -817,8 +883,6 @@ export function LogEventDialog({
                         form.setValue("revenue_share_percentage", "");
                         form.setValue("linked_distribution_entry_id", "");
                         form.setValue("dist_views", "");
-                        form.setValue("dist_likes", "");
-                        form.setValue("dist_comments", "");
                         form.setValue("cost_type", "one_time");
                         form.setValue("recurrence_option", "monthly");
                         form.setValue("recurrence_label", "");
@@ -848,278 +912,196 @@ export function LogEventDialog({
           {effectiveType === "distribution" ? (
             <div
               className={cn(
-                "space-y-6 rounded-xl border-x border-b border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/50 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5",
-                DISTRIBUTION_SHELL_ACCENT[distPlatform]
+                "space-y-5 rounded-xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/50 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5"
               )}
             >
-              <div className="space-y-2">
-                <Label className="text-[13px] font-semibold text-zinc-900">
-                  Platform
-                </Label>
-                <Select
-                  value={distPlatform}
-                  onValueChange={(v) =>
-                    form.setValue("platform", v as DistributionPlatform)
-                  }
-                >
-                  <SelectTrigger
-                    ref={platformTriggerRef}
-                    className="h-10 w-full max-w-full rounded-xl border-zinc-200/90 bg-white py-2 shadow-sm"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start" alignItemWithTrigger={false}>
-                    {PLATFORM_ORDER.map((opt) => (
-                      <SelectItem key={opt} value={opt}>
-                        <span className="inline-flex items-center gap-2">
-                          <PlatformIcon platform={opt} className="size-3.5" />
-                          {DISTRIBUTION_PLATFORM_LABELS[opt]}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {distPlatform === "reddit" ? (
+              <div className="space-y-3 rounded-xl border border-zinc-200/80 bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  Content
+                </p>
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="ev-dist-subreddit"
-                    className="text-[13px] font-semibold text-zinc-900"
-                  >
-                    Subreddit{" "}
-                    <span className="font-normal text-zinc-500">(optional)</span>
+                  <Label htmlFor="ev-title" className="text-[13px] font-semibold text-zinc-900">
+                    Content title <span className="font-normal text-zinc-500">(optional)</span>
                   </Label>
                   <Input
-                    id="ev-dist-subreddit"
+                    id="ev-title"
                     className="h-10 rounded-xl border-zinc-200/90 bg-white text-[15px] shadow-sm"
-                    placeholder="e.g. SaaS (no r/)"
-                    autoComplete="off"
-                    {...form.register("dist_subreddit")}
+                    placeholder="Optional title for this piece of content"
+                    {...form.register("title")}
                   />
-                  <p className="text-[11px] text-zinc-500">
-                    Track which community this ran in for cross-post comparisons.
-                  </p>
                 </div>
-              ) : null}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="ev-desc-dist"
+                    className="text-[13px] font-semibold text-zinc-900"
+                  >
+                    Global notes <span className="font-normal text-zinc-500">(optional)</span>
+                  </Label>
+                  <Textarea
+                    id="ev-desc-dist"
+                    className="min-h-[80px] rounded-xl border-zinc-200/90 bg-white shadow-sm"
+                    placeholder="Shared context for all platform entries"
+                    {...form.register("description")}
+                  />
+                </div>
+              </div>
 
-              <TooltipProvider delay={200}>
-                <div className="space-y-3 rounded-xl border border-zinc-200/70 bg-white/60 p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      id="ev-cross-post-track"
-                      type="checkbox"
-                      className="mt-1 size-4 rounded border-zinc-300 text-zinc-900"
-                      checked={crossPostTrack}
-                      onChange={(e) =>
-                        form.setValue("cross_post_track", e.target.checked)
-                      }
-                    />
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <Label
-                        htmlFor="ev-cross-post-track"
-                        className="cursor-pointer text-[13px] font-semibold text-zinc-900"
-                      >
-                        Cross-post tracking
-                      </Label>
-                      <p className="text-[12px] leading-snug text-zinc-500">
-                        Link this post to the same content idea published elsewhere (Pro).
-                      </p>
-                    </div>
-                  </div>
-
-                  {crossPostTrack ? (
-                    <div className="space-y-4 border-t border-zinc-200/60 pt-4">
-                      {!isPro ? (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-left text-[12px] font-medium text-amber-950"
-                          onClick={() => openUpgrade()}
-                        >
-                          Upgrade to Pro to compare the same content across platforms and
-                          communities
-                        </button>
-                      ) : null}
-                      <div className={cn(!isPro && "opacity-55")}>
-                      <div className="space-y-2">
-                        <Label className="text-[12px] text-zinc-700">Attach to</Label>
-                        <Select
-                          value={crossPostAttach}
-                          onValueChange={(v) =>
-                            form.setValue(
-                              "cross_post_attach",
-                              v as "new" | "existing"
-                            )
-                          }
-                          disabled={!isPro}
-                        >
-                          <SelectTrigger className="h-10 rounded-xl border-zinc-200/90 bg-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">New content group</SelectItem>
-                            <SelectItem value="existing">Existing group</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {crossPostAttach === "new" ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="ev-new-cg-title"
-                              className="text-[12px] text-zinc-700"
-                            >
-                              Content group title
-                            </Label>
-                            <Input
-                              id="ev-new-cg-title"
-                              className="h-10 rounded-xl border-zinc-200/90 bg-white"
-                              placeholder="e.g. April launch thread"
-                              disabled={!isPro}
-                              title={
-                                !isPro
-                                  ? "Upgrade to Pro to compare the same content across platforms and communities"
-                                  : undefined
-                              }
-                              {...form.register("new_content_group_title")}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="ev-new-cg-desc"
-                              className="text-[12px] text-zinc-700"
-                            >
-                              Description{" "}
-                              <span className="font-normal text-zinc-500">(optional)</span>
-                            </Label>
-                            <Textarea
-                              id="ev-new-cg-desc"
-                              className="min-h-[72px] rounded-xl border-zinc-200/90 bg-white"
-                              placeholder="What is this piece of content about?"
-                              disabled={!isPro}
-                              {...form.register("new_content_group_description")}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="space-y-2">
-                          <Label className="text-[12px] text-zinc-700">Content group</Label>
-                          <Select
-                            value={form.watch("content_group_existing_id") || "__none__"}
-                            onValueChange={(v) =>
-                              form.setValue(
-                                "content_group_existing_id",
-                                v === "__none__" || v == null ? "" : v
-                              )
-                            }
-                            disabled={!isPro}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    Platforms
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 rounded-lg border-zinc-200 px-2.5 text-[12px]"
+                    onClick={addDistributionEntry}
+                  >
+                    <Plus className="mr-1 size-3.5" />
+                    Add platform
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {distributionEntries.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className={cn(
+                        "space-y-3 rounded-xl border border-zinc-200 bg-white p-3 sm:p-4",
+                        DISTRIBUTION_SHELL_ACCENT[entry.platform]
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-[12px] font-medium text-zinc-700">
+                          Entry {index + 1}
+                        </p>
+                        {distributionEntries.length > 1 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-7 rounded-md px-2 text-zinc-500 hover:text-zinc-800"
+                            onClick={() => removeDistributionEntry(entry.id)}
                           >
-                            <SelectTrigger className="h-10 rounded-xl border-zinc-200/90 bg-white">
-                              <SelectValue placeholder="Choose a group" />
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-[13px] font-semibold text-zinc-900">
+                            Platform
+                          </Label>
+                          <Select
+                            value={entry.platform}
+                            onValueChange={(v) =>
+                              updateDistributionEntry(entry.id, {
+                                platform: v as DistributionPlatform,
+                                subreddit:
+                                  v === "reddit" ? entry.subreddit : "",
+                              })
+                            }
+                          >
+                            <SelectTrigger
+                              ref={index === 0 ? platformTriggerRef : undefined}
+                              className="h-10 rounded-xl border-zinc-200/90 bg-white"
+                            >
+                              <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">Select…</SelectItem>
-                              {contentGroupOptions.map((g) => (
-                                <SelectItem key={g.id} value={g.id}>
-                                  {g.title}
+                            <SelectContent align="start" alignItemWithTrigger={false}>
+                              {PLATFORM_ORDER.map((opt) => (
+                                <SelectItem key={opt} value={opt}>
+                                  <span className="inline-flex items-center gap-2">
+                                    <PlatformIcon platform={opt} className="size-3.5" />
+                                    {DISTRIBUTION_PLATFORM_LABELS[opt]}
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                          {isPro && contentGroupOptions.length === 0 ? (
-                            <p className="text-[11px] text-zinc-500">
-                              No groups yet — choose &quot;New content group&quot; above.
-                            </p>
-                          ) : null}
                         </div>
-                      )}
+                        <div className="space-y-2">
+                          <Label className="text-[13px] font-semibold text-zinc-900">
+                            Date
+                          </Label>
+                          <Input
+                            type="date"
+                            className="h-10 rounded-xl border-zinc-200/90 bg-white"
+                            value={entry.entry_date}
+                            onChange={(e) =>
+                              updateDistributionEntry(entry.id, {
+                                entry_date: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      {entry.platform === "reddit" ? (
+                        <div className="space-y-2">
+                          <Label className="text-[13px] font-semibold text-zinc-900">
+                            Subreddit <span className="font-normal text-zinc-500">(optional)</span>
+                          </Label>
+                          <Input
+                            className="h-10 rounded-xl border-zinc-200/90 bg-white"
+                            placeholder="e.g. SaaS (no r/)"
+                            value={entry.subreddit}
+                            onChange={(e) =>
+                              updateDistributionEntry(entry.id, {
+                                subreddit: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ) : null}
+                      <div className="space-y-2">
+                        <Label className="text-[13px] font-semibold text-zinc-900">Link</Label>
+                        <Input
+                          className="h-10 rounded-xl border-zinc-200/90 bg-white text-[15px]"
+                          placeholder="Paste post link"
+                          value={entry.url}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            const detected = detectPlatformFromUrl(next);
+                            updateDistributionEntry(entry.id, {
+                              url: next,
+                              platform: detected ?? entry.platform,
+                            });
+                          }}
+                          ref={index === 0 ? postUrlInputRef : undefined}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-[13px] font-semibold text-zinc-900">
+                            Views <span className="font-normal text-zinc-500">(optional)</span>
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="h-10 rounded-xl border-zinc-200/90 bg-white"
+                            placeholder="e.g. 1200"
+                            value={entry.views}
+                            onChange={(e) =>
+                              updateDistributionEntry(entry.id, { views: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[13px] font-semibold text-zinc-900">
+                            Notes <span className="font-normal text-zinc-500">(optional)</span>
+                          </Label>
+                          <Input
+                            className="h-10 rounded-xl border-zinc-200/90 bg-white"
+                            placeholder="Optional per-platform note"
+                            value={entry.notes}
+                            onChange={(e) =>
+                              updateDistributionEntry(entry.id, { notes: e.target.value })
+                            }
+                          />
+                        </div>
                       </div>
                     </div>
-                  ) : null}
+                  ))}
                 </div>
-              </TooltipProvider>
-
-              <div className="space-y-2">
-                <Label htmlFor="ev-url" className="text-[13px] font-semibold text-zinc-900">
-                  Link
-                </Label>
-                <Input
-                  id="ev-url"
-                  className="h-10 rounded-xl border-zinc-200/90 bg-white text-[15px] shadow-sm"
-                  placeholder="Paste post link"
-                  autoComplete="off"
-                  {...distUrlField}
-                  ref={(el) => {
-                    postUrlInputRef.current = el;
-                    distUrlField.ref(el);
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/90 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <Label
-                        htmlFor="ev-dist-views"
-                        className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500"
-                      >
-                        Views
-                      </Label>
-                      <span className="text-[11px] text-zinc-500">Optional</span>
-                    </div>
-                    <Input
-                      id="ev-dist-views"
-                      type="number"
-                      min="0"
-                      step="1"
-                      className="mt-2 h-9 border-0 bg-transparent p-0 text-lg font-semibold tabular-nums text-zinc-900 shadow-none focus-visible:ring-0"
-                      placeholder="—"
-                      {...form.register("dist_views")}
-                    />
-                </div>
-              </div>
-
-              {!distQuick ? (
-                <div className="space-y-2 rounded-xl border border-dashed border-zinc-200/90 bg-white/70 p-4">
-                  <Label
-                    htmlFor="ev-file-dist"
-                    className="text-[13px] font-semibold text-zinc-900"
-                  >
-                    Upload analytics screenshot
-                  </Label>
-                  <p className="text-[12px] leading-snug text-zinc-500">
-                    We&apos;ll extract metrics automatically
-                  </p>
-                  <Input
-                    id="ev-file-dist"
-                    type="file"
-                    accept={TIMELINE_SNAPSHOT_ACCEPT}
-                    className="cursor-pointer rounded-lg border-zinc-200/80 bg-white text-[13px] file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-zinc-800"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  />
-                  {screenshotProcessing ? (
-                    <p className="flex items-center gap-2 text-[12px] font-medium text-zinc-600">
-                      <Loader2
-                        className="size-3.5 shrink-0 animate-spin text-zinc-500"
-                        aria-hidden
-                      />
-                      Processing…
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="space-y-2">
-                <Label htmlFor="ev-desc-dist" className="text-[13px] text-zinc-800">
-                  Notes{" "}
-                  <span className="font-normal text-zinc-500">(optional)</span>
-                </Label>
-                <Textarea
-                  id="ev-desc-dist"
-                  className="min-h-[80px] rounded-xl border-zinc-200/90 bg-white shadow-sm"
-                  placeholder="Anything interesting about this post?"
-                  {...form.register("description")}
-                />
               </div>
             </div>
           ) : null}
@@ -1367,20 +1349,22 @@ export function LogEventDialog({
           ) : null}
             </div>
           </div>
-          <div className="space-y-2 border-t border-zinc-200/60 pt-4">
-            <Label
-              htmlFor="ev-date-shared"
-              className="text-[13px] font-semibold text-zinc-900"
-            >
-              Date
-            </Label>
-            <Input
-              id="ev-date-shared"
-              type="date"
-              className="h-10 max-w-[11rem] rounded-xl border-zinc-200/90 bg-white shadow-sm"
-              {...form.register("entry_date")}
-            />
-          </div>
+          {effectiveType !== "distribution" ? (
+            <div className="space-y-2 border-t border-zinc-200/60 pt-4">
+              <Label
+                htmlFor="ev-date-shared"
+                className="text-[13px] font-semibold text-zinc-900"
+              >
+                Date
+              </Label>
+              <Input
+                id="ev-date-shared"
+                type="date"
+                className="h-10 max-w-[11rem] rounded-xl border-zinc-200/90 bg-white shadow-sm"
+                {...form.register("entry_date")}
+              />
+            </div>
+          ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
