@@ -69,10 +69,24 @@ export const mockProjects: Project[] = [
       "Retro synth one-shots and loops for Ableton & Logic — 90s hardware, modern mix.",
     status: "idea",
     logo_url: null,
-    color: "#f97316",
+    color: "#64748b",
     icon: "Zap",
     created_at: isoMs(-86400000 * 8),
     updated_at: isoMs(-86400000 * 3),
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000099",
+    user_id: MOCK_USER_ID,
+    name: "General / overhead",
+    description:
+      "Shared overhead and spend not tied to a specific product bet.",
+    status: "paused",
+    logo_url: null,
+    color: "#94a3b8",
+    icon: null,
+    created_at: isoMs(-86400000 * 200),
+    updated_at: isoMs(-86400000 * 1),
+    is_overhead: true,
   },
 ];
 

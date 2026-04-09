@@ -1,5 +1,7 @@
+import { ensureOverheadProject } from "@/lib/data/overhead-project";
 import { listTimelineByTypesSince } from "@/lib/data/timeline";
 import type { TimelineEntry } from "@/types/momentum";
+import { z } from "zod";
 
 /** URL / UI range id. Free users are limited to `this_month` on the server. */
 export type FinancialRangeKey =
@@ -24,6 +26,20 @@ export function parseFinancialRangeParam(
   return RANGE_KEYS.includes(n as FinancialRangeKey)
     ? (n as FinancialRangeKey)
     : "this_month";
+}
+
+/** `all` = portfolio-wide; otherwise a project UUID from the URL. */
+export type FinancialProjectFilter = "all" | string;
+
+export function parseFinancialProjectParam(
+  raw: Record<string, string | string[] | undefined> | undefined
+): FinancialProjectFilter {
+  const v = raw?.project;
+  const one = Array.isArray(v) ? v[0] : v;
+  if (!one || typeof one !== "string") return "all";
+  const t = one.trim();
+  if (t === "" || t.toLowerCase() === "all") return "all";
+  return z.string().uuid().safeParse(t).success ? t : "all";
 }
 
 function utcTodayIso(): string {
@@ -167,14 +183,19 @@ function aggregateByKey(
  */
 export async function getFinancialIntelligenceSnapshot(
   userId: string,
-  rangeKey: FinancialRangeKey = "this_month"
+  rangeKey: FinancialRangeKey = "this_month",
+  projectFilter: FinancialProjectFilter = "all"
 ): Promise<FinancialIntelligenceSnapshot> {
   const { sinceDate, untilDate, periodLabel } = financialRangeBounds(rangeKey);
+  await ensureOverheadProject(userId);
+  const projectId =
+    projectFilter !== "all" ? projectFilter : undefined;
   const rows = await listTimelineByTypesSince(
     userId,
     ["revenue", "cost", "deal"],
     sinceDate,
-    untilDate
+    untilDate,
+    projectId
   );
 
   const revenueRows = rows.filter((r) => r.type === "revenue");

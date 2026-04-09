@@ -3,6 +3,11 @@ import { PLATFORM_CONFIG } from "@/lib/platform-config";
 
 export const MOCK_USER_ID = "00000000-0000-4000-8000-000000000001";
 
+/** Display name for the per-user overhead project (DB row with `is_overhead`). */
+export const OVERHEAD_PROJECT_NAME = "General / overhead";
+export const OVERHEAD_PROJECT_DESCRIPTION =
+  "Shared overhead and spend not tied to a specific product bet.";
+
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   idea: "Idea",
   building: "Building",

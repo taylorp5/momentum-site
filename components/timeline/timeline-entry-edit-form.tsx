@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateTimelineEntryAction } from "@/app/actions/timeline";
 import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
@@ -48,8 +48,16 @@ export type TimelineEntryForEdit = TimelineEntry & {
   image_signed_url: string | null;
 };
 
+export type ExpenseProjectOption = {
+  id: string;
+  name: string;
+  is_overhead?: boolean;
+};
+
 type Props = {
   entry: TimelineEntryForEdit;
+  /** When set, cost entries can be reassigned to another project (e.g. overhead). */
+  expenseProjectOptions?: ExpenseProjectOption[];
   disabled?: boolean;
   onCancel: () => void;
   onSaved: () => void;
@@ -59,6 +67,7 @@ type Props = {
 
 export function TimelineEntryEditForm({
   entry,
+  expenseProjectOptions,
   disabled = false,
   onCancel,
   onSaved,
@@ -104,6 +113,11 @@ export function TimelineEntryEditForm({
   const [buildKind, setBuildKind] = useState<BuildProgressKind>(() =>
     entry.type === "build" ? buildSubtypeToKind(entry.event_subtype) : "progress"
   );
+  const [costProjectId, setCostProjectId] = useState(entry.project_id);
+
+  useEffect(() => {
+    setCostProjectId(entry.project_id);
+  }, [entry.id, entry.project_id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -162,8 +176,19 @@ export function TimelineEntryEditForm({
             toast.error("Enter a valid amount.");
             return;
           }
+          const targetPid = expenseProjectOptions?.length
+            ? costProjectId
+            : entry.project_id;
+          if (
+            expenseProjectOptions?.length &&
+            !expenseProjectOptions.some((p) => p.id === targetPid)
+          ) {
+            toast.error("Choose a valid project.");
+            return;
+          }
           payload = {
             ...base,
+            project_id: targetPid,
             amount: n,
             category: category.trim(),
             cost_title_override: costTitleOverride.trim() || undefined,
@@ -385,6 +410,27 @@ export function TimelineEntryEditForm({
 
       {entry.type === "cost" ? (
         <>
+          {expenseProjectOptions?.length ? (
+            <div className="space-y-1">
+              <Label className="text-[11px] text-zinc-600">Project</Label>
+              <Select
+                value={costProjectId}
+                onValueChange={(v) => setCostProjectId(v ?? entry.project_id)}
+                disabled={disabled || pending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseProjectOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-1">
             <Label className="text-[11px] text-zinc-600">Amount</Label>
             <div className="relative">

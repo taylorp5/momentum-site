@@ -18,7 +18,10 @@ import { DistributionPostRoiFooter } from "@/components/distribution/distributio
 import { PlatformIcon } from "@/components/distribution/platform-icon";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
 import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
-import { TimelineEntryEditForm } from "@/components/timeline/timeline-entry-edit-form";
+import {
+  TimelineEntryEditForm,
+  type ExpenseProjectOption,
+} from "@/components/timeline/timeline-entry-edit-form";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ProjectExportStoryButton } from "@/components/projects/project-export-story-button";
 import { ProjectAvatar } from "@/components/projects/project-avatar";
@@ -62,6 +65,8 @@ export type TimelineRow = TimelineEntry & {
 
 type ProjectDetailClientProps = {
   project: Project;
+  /** All projects (including General / overhead) for expense logging and edits. */
+  allProjectsForLog: Project[];
   defaultTab?: string;
   showStartPrompt?: boolean;
   overview: {
@@ -87,6 +92,7 @@ type ProjectDetailClientProps = {
 
 export function ProjectDetailClient({
   project,
+  allProjectsForLog,
   defaultTab = "overview",
   showStartPrompt = false,
   overview,
@@ -150,6 +156,23 @@ export function ProjectDetailClient({
     [filteredTimeline, contentGroupTitles]
   );
 
+  const expenseProjectOptions: ExpenseProjectOption[] = useMemo(
+    () =>
+      [...allProjectsForLog]
+        .sort((a, b) => {
+          const ao = a.is_overhead ? 1 : 0;
+          const bo = b.is_overhead ? 1 : 0;
+          if (ao !== bo) return ao - bo;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        })
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          is_overhead: p.is_overhead,
+        })),
+    [allProjectsForLog]
+  );
+
   const toggleTimelineGroup = (groupId: string) => {
     setExpandedTimelineGroups((prev) => {
       const next = new Set(prev);
@@ -192,6 +215,16 @@ export function ProjectDetailClient({
           >
             All projects
           </Link>
+          <Link
+            href={`/financials?project=${encodeURIComponent(project.id)}`}
+            className={buttonVariants({
+              variant: "outline",
+              className:
+                "h-10 rounded-[10px] border-zinc-200/90 px-4 text-[13px] font-semibold",
+            })}
+          >
+            Financials
+          </Link>
         </div>
       </div>
 
@@ -208,7 +241,7 @@ export function ProjectDetailClient({
               </p>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <LogEventDialog projectId={project.id} projects={[project]}>
+              <LogEventDialog projectId={project.id} projects={allProjectsForLog}>
                 <Button className="h-9 rounded-lg">Log event</Button>
               </LogEventDialog>
             </div>
@@ -374,7 +407,7 @@ export function ProjectDetailClient({
                 assets, and insights. Filter when you want to focus.
               </p>
             </div>
-            <LogEventDialog projectId={project.id} projects={[project]}>
+            <LogEventDialog projectId={project.id} projects={allProjectsForLog}>
               <Button
                 className="h-10 shrink-0 rounded-[10px] bg-zinc-900 px-4 text-[13px] font-semibold hover:bg-zinc-800"
                 disabled={isMockDataMode()}
@@ -391,7 +424,7 @@ export function ProjectDetailClient({
               title="Capture what shipped"
               description="Notes for decisions, links to launches, snapshots with receipts — your future self uses this to remember the arc, not just the code."
               action={
-                <LogEventDialog projectId={project.id} projects={[project]}>
+                <LogEventDialog projectId={project.id} projects={allProjectsForLog}>
                   <Button
                     className="h-10 rounded-[10px]"
                     disabled={isMockDataMode()}
@@ -446,6 +479,7 @@ export function ProjectDetailClient({
                       <TimelineFeedCard
                         key={item.entry.id}
                         entry={item.entry}
+                        expenseProjectOptions={expenseProjectOptions}
                         mockReadOnly={isMockDataMode()}
                         onUpdated={() => router.refresh()}
                       />
@@ -462,6 +496,7 @@ export function ProjectDetailClient({
                         renderChildEntry={(e) => (
                           <TimelineFeedCard
                             entry={e}
+                            expenseProjectOptions={expenseProjectOptions}
                             mockReadOnly={isMockDataMode()}
                             onUpdated={() => router.refresh()}
                           />
@@ -480,6 +515,7 @@ export function ProjectDetailClient({
                       renderChildEntry={(e) => (
                         <TimelineFeedCard
                           entry={e}
+                          expenseProjectOptions={expenseProjectOptions}
                           mockReadOnly={isMockDataMode()}
                           onUpdated={() => router.refresh()}
                         />
@@ -505,7 +541,7 @@ export function ProjectDetailClient({
             </div>
             <LogEventDialog
               projectId={project.id}
-              projects={[project]}
+              projects={allProjectsForLog}
               defaultEventType="distribution"
             >
               <Button
@@ -526,7 +562,7 @@ export function ProjectDetailClient({
               action={
                 <LogEventDialog
                   projectId={project.id}
-                  projects={[project]}
+                  projects={allProjectsForLog}
                   defaultEventType="distribution"
                 >
                   <Button
@@ -666,7 +702,7 @@ export function ProjectDetailClient({
             open={followUpLogOpen}
             onOpenChange={setFollowUpLogOpen}
             projectId={project.id}
-            projects={[project]}
+            projects={allProjectsForLog}
             defaultEventType="distribution"
             defaultDistributionPlatform={followUpAnchor.platform}
             distributionPrefill={followUpLogPrefill}
@@ -679,10 +715,12 @@ export function ProjectDetailClient({
 
 function TimelineFeedCard({
   entry,
+  expenseProjectOptions,
   mockReadOnly = false,
   onUpdated,
 }: {
   entry: TimelineRow;
+  expenseProjectOptions: ExpenseProjectOption[];
   mockReadOnly?: boolean;
   onUpdated: () => void;
 }) {
@@ -697,6 +735,9 @@ function TimelineFeedCard({
       >
         <TimelineEntryEditForm
           entry={entry}
+          expenseProjectOptions={
+            entry.type === "cost" ? expenseProjectOptions : undefined
+          }
           disabled={mockReadOnly}
           onCancel={() => setEditing(false)}
           onSaved={() => {

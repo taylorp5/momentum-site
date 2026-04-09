@@ -88,11 +88,28 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
         status: p.status,
         color: p.color,
         icon: p.icon,
+        is_overhead: p.is_overhead,
         created_at: p.created_at,
         updated_at: p.updated_at,
       })),
     [projects]
   );
+
+  const sortedExpenseProjects = useMemo(
+    () =>
+      [...projects].sort((a, b) => {
+        const ao = a.is_overhead ? 1 : 0;
+        const bo = b.is_overhead ? 1 : 0;
+        if (ao !== bo) return ao - bo;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      }),
+    [projects]
+  );
+
+  const filteredProjectLabel =
+    project !== "all"
+      ? projects.find((p) => p.id === project)?.name ?? null
+      : null;
 
   function apply(
     next: Partial<{
@@ -168,7 +185,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All projects</SelectItem>
-                {projects.map((p) => (
+                {sortedExpenseProjects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -271,10 +288,8 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
               <TableHeader>
                 <TableRow className="bg-zinc-50/90 hover:bg-zinc-50/90">
                   <TableHead className="w-[120px]">Date</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="min-w-[240px]">Expense</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead className="w-[120px]">Type</TableHead>
                 </TableRow>
               </TableHeader>
@@ -288,17 +303,19 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                     <TableCell className="text-zinc-600">
                       {format(new Date(row.entry_date), "MMM d, yyyy")}
                     </TableCell>
-                    <TableCell className="font-medium text-zinc-900">{row.project_name}</TableCell>
-                    <TableCell className="capitalize text-zinc-700">
-                      <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/80 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
-                        {row.category ?? "Uncategorized"}
-                      </span>
+                    <TableCell className="text-zinc-900">
+                      <p className="text-[13px] font-semibold leading-snug tracking-tight">
+                        <span className="text-zinc-950">{row.project_name}</span>
+                        <span className="font-normal text-zinc-400"> · </span>
+                        <span className="tabular-nums">{money.format(row.amount)}</span>
+                        <span className="font-normal text-zinc-400"> · </span>
+                        <span className="font-medium capitalize text-zinc-800">
+                          {row.category ?? "Uncategorized"}
+                        </span>
+                      </p>
                     </TableCell>
-                    <TableCell className="max-w-[420px] truncate text-zinc-600">
+                    <TableCell className="max-w-[380px] truncate text-[13px] text-zinc-600">
                       {row.description || row.title}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-semibold text-zinc-950">
-                      {money.format(row.amount)}
                     </TableCell>
                     <TableCell className="text-zinc-600">
                       <span
@@ -332,6 +349,12 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
         <p className="mt-1 text-[14px] text-zinc-600">
           Your spending snapshot this month, rolled up from the ledger.
         </p>
+        {filteredProjectLabel ? (
+          <p className="mt-2 text-[13px] font-medium text-zinc-800">
+            Filtered to <span className="text-zinc-950">{filteredProjectLabel}</span> — totals
+            match the ledger below.
+          </p>
+        ) : null}
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">

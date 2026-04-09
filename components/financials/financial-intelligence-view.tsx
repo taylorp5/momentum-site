@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -20,12 +21,22 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   FinancialIntelligenceSnapshot,
+  FinancialProjectFilter,
   FinancialRangeKey,
 } from "@/lib/data/financial-intelligence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { Project } from "@/types/momentum";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -43,9 +54,31 @@ const RANGE_OPTIONS: { id: FinancialRangeKey; label: string }[] = [
 type Props = {
   snapshot: FinancialIntelligenceSnapshot;
   activeRange: FinancialRangeKey;
+  activeProjectFilter: FinancialProjectFilter;
+  projects: Project[];
   /** Server plan: custom ranges only when true (RevenueCat-only Pro still sees locked ranges until profile updates). */
   canCustomizeDateRange: boolean;
 };
+
+function sortProjectsForPicker(projects: Project[]): Project[] {
+  return [...projects].sort((a, b) => {
+    const ao = a.is_overhead ? 1 : 0;
+    const bo = b.is_overhead ? 1 : 0;
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+}
+
+function financialsHref(
+  range: FinancialRangeKey,
+  projectId: FinancialProjectFilter
+): string {
+  const p = new URLSearchParams();
+  if (range !== "this_month") p.set("range", range);
+  if (projectId !== "all") p.set("project", projectId);
+  const qs = p.toString();
+  return qs ? `/financials?${qs}` : "/financials";
+}
 
 type InsightBlock = {
   headline: string;
@@ -372,11 +405,25 @@ function BreakdownBars({
 export function FinancialIntelligenceView({
   snapshot,
   activeRange,
+  activeProjectFilter,
+  projects,
   canCustomizeDateRange,
 }: Props) {
   const { isPro, openUpgrade } = usePlan();
+  const router = useRouter();
+  const pathname = usePathname();
   const s = snapshot;
   const insight = dashboardInsight(s);
+  const sortedProjects = sortProjectsForPicker(projects);
+
+  function pushFinancialsQuery(next: { project?: FinancialProjectFilter }) {
+    const p = new URLSearchParams();
+    if (activeRange !== "this_month") p.set("range", activeRange);
+    const proj = next.project ?? activeProjectFilter;
+    if (proj !== "all") p.set("project", proj);
+    const qs = p.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   const revenueRows = s.revenueBySource.map((r) => ({
     label: r.source,
@@ -502,8 +549,7 @@ export function FinancialIntelligenceView({
                 </button>
               );
             }
-            const href =
-              opt.id === "this_month" ? "/financials" : `/financials?range=${opt.id}`;
+            const href = financialsHref(opt.id, activeProjectFilter);
             return (
               <Link
                 key={opt.id}
@@ -527,6 +573,38 @@ export function FinancialIntelligenceView({
             more ranges.
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+          Project
+        </p>
+        <div className="max-w-xs">
+          <Label className="sr-only">Filter by project</Label>
+          <Select
+            value={activeProjectFilter}
+            onValueChange={(v) =>
+              pushFinancialsQuery({
+                project: !v || v === "all" ? "all" : v,
+              })
+            }
+          >
+            <SelectTrigger className="h-10 rounded-lg border-zinc-200 text-[13px]">
+              <SelectValue placeholder="Project scope" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All projects</SelectItem>
+              {sortedProjects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Revenue, costs, and net income respect this scope — like checking one bet or the whole portfolio.
+        </p>
       </div>
 
       <NetIncomeHero

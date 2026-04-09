@@ -9,7 +9,8 @@ import {
 } from "@/lib/data/distribution";
 import { isProPlan } from "@/lib/plan";
 import { getContentGroupTitlesByIds } from "@/lib/data/content-groups";
-import { getProject } from "@/lib/data/projects";
+import { ensureOverheadProject } from "@/lib/data/overhead-project";
+import { getProject, listProjects } from "@/lib/data/projects";
 import { listTimelineForProject, signTimelineImageUrl } from "@/lib/data/timeline";
 import type { TimelineRow } from "@/components/projects/project-detail-client";
 import { getWorkSessionSummary } from "@/lib/data/work-sessions";
@@ -54,6 +55,9 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
+  await ensureOverheadProject(user.id);
+  const allProjectsForLog = await listProjects(user.id);
+
   const [profile, overviewData, timeline, distribution, revenueByDistributionId, workSessions] =
     await Promise.all([
       getProfile(user.id),
@@ -96,6 +100,7 @@ export default async function ProjectDetailPage({
   return (
     <ProjectDetailClient
       project={project}
+      allProjectsForLog={allProjectsForLog}
       defaultTab={tab ?? "overview"}
       showStartPrompt={hasNoEntries}
       overview={overview}

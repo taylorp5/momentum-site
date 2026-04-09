@@ -69,6 +69,15 @@ import type {
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 
+function sortProjectsForExpensePicker(projects: Project[]): Project[] {
+  return [...projects].sort((a, b) => {
+    const ao = a.is_overhead ? 1 : 0;
+    const bo = b.is_overhead ? 1 : 0;
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+}
+
 type FormValues = {
   project_id: string;
   type: z.infer<typeof timelineEntryTypeSchema>;
@@ -458,7 +467,8 @@ export function LogEventDialog({
   const platformTriggerRef = useRef<HTMLButtonElement | null>(null);
   const postUrlInputRef = useRef<HTMLInputElement | null>(null);
 
-  const initialProjectId = fixedProjectId ?? projects?.[0]?.id ?? "";
+  const costFlow = (defaultEventType ?? defaultType) === "cost";
+  const initialProjectId = fixedProjectId ?? (costFlow ? "" : projects?.[0]?.id ?? "");
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -489,7 +499,11 @@ export function LogEventDialog({
   useEffect(() => {
     if (!open) return;
     if (distributionEdit) return;
-    const pid = fixedProjectId ?? projects?.[0]?.id ?? "";
+    const t = defaultEventType ?? defaultType;
+    const pid =
+      t === "cost"
+        ? fixedProjectId ?? ""
+        : fixedProjectId ?? projects?.[0]?.id ?? "";
     form.setValue("project_id", pid);
     form.setValue("type", defaultEventType ?? defaultType);
     if (defaultEventType === "distribution" && defaultDistributionPlatform) {
@@ -522,7 +536,10 @@ export function LogEventDialog({
   const distQuick =
     Boolean(distributionQuickMode) && isDistributionFlow && !isDistributionEditMode;
   const showProjectSelect =
-    !fixedProjectId && (projects?.length ?? 0) > 1 && !isDistributionEditMode;
+    !fixedProjectId &&
+    (projects?.length ?? 0) > 1 &&
+    !isDistributionEditMode &&
+    effectiveType !== "cost";
   const selectedProjectId = form.watch("project_id") || "";
   const hasProjectContext = Boolean(
     (fixedProjectId ?? selectedProjectId ?? "").trim()
@@ -658,7 +675,14 @@ export function LogEventDialog({
 
       let imagePath: string | null = null;
       const submitType = defaultEventType ?? values.type;
-      const projectIdForSubmit = (fixedProjectId ?? values.project_id ?? "").trim();
+      let projectIdForSubmit = (fixedProjectId ?? values.project_id ?? "").trim();
+      if (submitType === "cost") {
+        projectIdForSubmit = (values.project_id ?? fixedProjectId ?? "").trim();
+        if (!z.string().uuid().safeParse(projectIdForSubmit).success) {
+          toast.error("Choose a project for this expense.");
+          return;
+        }
+      }
       if (
         submitType === "distribution" &&
         !z.string().uuid().safeParse(projectIdForSubmit).success
@@ -925,8 +949,13 @@ export function LogEventDialog({
         duration: 4000,
       });
       setOpen(false);
+      const resetFlow = defaultEventType ?? defaultType;
+      const resetProjectId =
+        resetFlow === "cost"
+          ? fixedProjectId ?? ""
+          : fixedProjectId ?? projects?.[0]?.id ?? "";
       form.reset({
-        project_id: fixedProjectId ?? projects?.[0]?.id ?? "",
+        project_id: resetProjectId,
         type: defaultEventType ?? defaultType,
         entry_date: new Date().toISOString().slice(0, 10),
         title: "",
@@ -1038,7 +1067,7 @@ export function LogEventDialog({
               Add a project first, then log distribution posts under that project.
             </p>
           ) : null}
-          {!showProjectSelect && fixedProject ? (
+          {!showProjectSelect && fixedProject && effectiveType !== "cost" ? (
             <div className="space-y-1.5">
               <Label>Project</Label>
               <div className="flex h-9 items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[13px] font-medium text-zinc-800">
@@ -1429,6 +1458,31 @@ export function LogEventDialog({
           ) : null}
           {effectiveType === "cost" ? (
             <>
+              {(projects?.length ?? 0) > 0 ? (
+                <div className="space-y-2">
+                  <Label>Project</Label>
+                  <Select
+                    value={selectedProjectId || undefined}
+                    onValueChange={(v) => {
+                      if (v) form.setValue("project_id", v);
+                    }}
+                  >
+                    <SelectTrigger className="rounded-lg border-zinc-200">
+                      <SelectValue placeholder="Choose project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortProjectsForExpensePicker(projects ?? []).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] leading-relaxed text-zinc-500">
+                    Tie this line to a bet, or use General / overhead for shared costs.
+                  </p>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="ev-amount-cost">Amount</Label>
                 <div className="relative">

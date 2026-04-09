@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { listProjectIds, listProjectSummaries } from "@/lib/data/projects";
+import { ensureOverheadProject } from "@/lib/data/overhead-project";
 import { isMockDataMode, isSupabaseConfigured } from "@/lib/env";
 import { mockTimelineEntries } from "@/lib/mock-data";
 
@@ -7,6 +8,8 @@ export type CostEventRow = {
   id: string;
   project_id: string;
   project_name: string;
+  /** True when row uses the synthetic overhead project */
+  is_overhead?: boolean;
   title: string;
   description: string;
   amount: number;
@@ -68,8 +71,12 @@ function applyFilters(rows: CostEventRow[], f: CostsFilters): CostEventRow[] {
 export async function getCostsView(userId: string, filters: CostsFilters = {}) {
   const monthStartIso = currentMonthStartIso();
 
+  await ensureOverheadProject(userId);
   const projects = await listProjectSummaries(userId);
   const nameById = new Map(projects.map((p) => [p.id, p.name]));
+  const overheadById = new Map(
+    projects.filter((p) => p.is_overhead).map((p) => [p.id, true])
+  );
 
   let rows: CostEventRow[] = [];
   if (isMockDataMode()) {
@@ -85,6 +92,7 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
         id: e.id,
         project_id: e.project_id,
         project_name: nameById.get(e.project_id) ?? "Project",
+        is_overhead: overheadById.get(e.project_id) === true,
         title: e.title,
         description: e.description,
         amount: e.amount,
@@ -115,6 +123,7 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
           id: r.id as string,
           project_id: r.project_id as string,
           project_name: nameById.get(r.project_id as string) ?? "Project",
+          is_overhead: overheadById.get(r.project_id as string) === true,
           title: (r.title as string) ?? "Cost event",
           description: (r.description as string) ?? "",
           amount: r.amount as number,
@@ -127,9 +136,10 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
     }
   }
 
-  const monthRows = rows.filter((r) => r.entry_date >= monthStartIso);
-  const totalSpendThisMonth = monthRows
-    .reduce((sum, r) => sum + r.amount, 0);
+  const filtered = applyFilters(rows, filters);
+
+  const monthRows = filtered.filter((r) => r.entry_date >= monthStartIso);
+  const totalSpendThisMonth = monthRows.reduce((sum, r) => sum + r.amount, 0);
   const recurringSubscriptionsThisMonth = monthRows
     .filter((r) => r.is_recurring)
     .reduce((sum, r) => sum + r.amount, 0);
@@ -147,8 +157,6 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
   const categoryBreakdown = [...byCategory.entries()]
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total);
-
-  const filtered = applyFilters(rows, filters);
 
   const categories = [...new Set(rows.map((r) => r.category?.trim() || "uncategorized"))]
     .sort((a, b) => a.localeCompare(b));

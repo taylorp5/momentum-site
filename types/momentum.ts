@@ -65,6 +65,8 @@ export type Project = {
   icon: string | null;
   created_at: string;
   updated_at: string;
+  /** Synthetic bucket for non-project expenses; hidden from main project grid. */
+  is_overhead?: boolean;
 };
 
 export type WorkSessionStatus = "running" | "paused" | "completed";

@@ -4,7 +4,7 @@ import { mockProjects } from "@/lib/mock-data";
 import type { Project } from "@/types/momentum";
 
 const projectRow =
-  "id, user_id, name, description, status, logo_url, color, icon, created_at, updated_at";
+  "id, user_id, name, description, status, logo_url, color, icon, is_overhead, created_at, updated_at";
 
 export async function listProjectIds(userId: string): Promise<string[]> {
   if (isMockDataMode()) {
@@ -25,11 +25,18 @@ export async function listProjectIds(userId: string): Promise<string[]> {
 /** Lightweight map for activity feeds and joins (id + name only). */
 export async function listProjectSummaries(
   userId: string
-): Promise<{ id: string; name: string; logo_url: string | null }[]> {
+): Promise<
+  { id: string; name: string; logo_url: string | null; is_overhead: boolean }[]
+> {
   if (isMockDataMode()) {
     return mockProjects
       .filter((p) => p.user_id === userId)
-      .map((p) => ({ id: p.id, name: p.name, logo_url: p.logo_url ?? null }));
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        logo_url: p.logo_url ?? null,
+        is_overhead: p.is_overhead ?? false,
+      }));
   }
   if (!isSupabaseConfigured()) {
     return [];
@@ -37,11 +44,16 @@ export async function listProjectSummaries(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, logo_url")
+    .select("id, name, logo_url, is_overhead")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as { id: string; name: string; logo_url: string | null }[];
+  return (data ?? []) as {
+    id: string;
+    name: string;
+    logo_url: string | null;
+    is_overhead: boolean;
+  }[];
 }
 
 export async function listProjects(userId: string): Promise<Project[]> {
@@ -88,7 +100,9 @@ export async function getProject(
 
 export async function countProjects(userId: string): Promise<number> {
   if (isMockDataMode()) {
-    return mockProjects.filter((p) => p.user_id === userId).length;
+    return mockProjects.filter(
+      (p) => p.user_id === userId && !p.is_overhead
+    ).length;
   }
   if (!isSupabaseConfigured()) {
     return 0;
@@ -97,7 +111,8 @@ export async function countProjects(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from("projects")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("is_overhead", false);
   if (error) throw error;
   return count ?? 0;
 }

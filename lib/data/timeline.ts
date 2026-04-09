@@ -129,7 +129,9 @@ export async function listTimelineByTypesSince(
   userId: string,
   types: TimelineEntry["type"][],
   sinceDate: string,
-  untilDate?: string | null
+  untilDate?: string | null,
+  /** When set, only rows for this project (must belong to the user). */
+  projectId?: string | null
 ): Promise<TimelineEntry[]> {
   if (types.length === 0) return [];
   if (isMockDataMode()) {
@@ -139,7 +141,8 @@ export async function listTimelineByTypesSince(
           e.user_id === userId &&
           types.includes(e.type) &&
           e.entry_date >= sinceDate &&
-          (!untilDate || e.entry_date <= untilDate)
+          (!untilDate || e.entry_date <= untilDate) &&
+          (!projectId || e.project_id === projectId)
       )
       .sort(
         (a, b) =>
@@ -153,11 +156,12 @@ export async function listTimelineByTypesSince(
   const supabase = await createClient();
   const ids = await listProjectIds(userId);
   if (ids.length === 0) return [];
+  if (projectId && !ids.includes(projectId)) return [];
 
   let query = supabase
     .from("timeline_entries")
     .select(timelineRow)
-    .in("project_id", ids)
+    .in("project_id", projectId ? [projectId] : ids)
     .in("type", types)
     .gte("entry_date", sinceDate);
   if (untilDate?.trim()) {

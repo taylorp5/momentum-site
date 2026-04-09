@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireSessionUser } from "@/lib/auth/user";
+import { ensureOverheadProject } from "@/lib/data/overhead-project";
 import { listProjects } from "@/lib/data/projects";
 import { listTimelineForProject } from "@/lib/data/timeline";
 import { listDistributionForProject } from "@/lib/data/distribution";
@@ -33,13 +34,15 @@ function latestActivityIso(
 
 export default async function ProjectsPage() {
   const user = await requireSessionUser();
+  await ensureOverheadProject(user.id);
   const projects = await listProjects(user.id);
+  const portfolioProjects = projects.filter((p) => !p.is_overhead);
 
   const timelineCounts = await Promise.all(
-    projects.map((p) => listTimelineForProject(user.id, p.id))
+    portfolioProjects.map((p) => listTimelineForProject(user.id, p.id))
   );
   const distributionCounts = await Promise.all(
-    projects.map((p) => listDistributionForProject(user.id, p.id))
+    portfolioProjects.map((p) => listDistributionForProject(user.id, p.id))
   );
 
   const totalTimeline = timelineCounts.reduce((a, t) => a + t.length, 0);
@@ -73,7 +76,7 @@ export default async function ProjectsPage() {
       <div className="grid gap-3.5 sm:grid-cols-3">
         <StatCard
           title="Active products"
-          value={projects.length}
+          value={portfolioProjects.length}
           icon={FolderKanban}
           tone="accent"
           className="py-4"
@@ -99,7 +102,7 @@ export default async function ProjectsPage() {
         />
       </div>
 
-      {projects.length === 0 ? (
+      {portfolioProjects.length === 0 ? (
         <EmptyState
           icon={<FolderOpen className="size-6" strokeWidth={1.5} />}
           title="No projects yet"
@@ -109,7 +112,7 @@ export default async function ProjectsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {projects.map((p, i) => (
+          {portfolioProjects.map((p, i) => (
             <ProjectCard
               key={p.id}
               project={p}

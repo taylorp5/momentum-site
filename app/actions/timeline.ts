@@ -11,6 +11,7 @@ import {
 import { getProfile, requireSessionUser } from "@/lib/auth/user";
 import { isMockDataMode, isSupabaseConfigured } from "@/lib/env";
 import { isProPlan } from "@/lib/plan";
+import { getProject } from "@/lib/data/projects";
 import { insertTimelineEntry } from "@/lib/services/timeline-entries";
 import { createClient } from "@/lib/supabase/server";
 import { distributionPlatformSchema } from "@/lib/validations/distribution";
@@ -162,6 +163,10 @@ export async function createLogEventAction(
   if (dataToInsert.type === "revenue") {
     revalidatePath("/distribution");
   }
+  if (dataToInsert.type === "cost") {
+    revalidatePath("/costs");
+    revalidatePath("/financials");
+  }
   return { success: true };
 }
 
@@ -213,7 +218,6 @@ export async function updateTimelineEntryAction(
       "id, user_id, project_id, type, title, description, external_url, entry_date, platform, metrics, subreddit, amount, category, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, image_url, event_metadata, event_subtype"
     )
     .eq("id", p.id)
-    .eq("project_id", p.project_id)
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -229,6 +233,10 @@ export async function updateTimelineEntryAction(
     }).format(value);
 
   const type = row.type as string;
+  const rowProjectId = row.project_id as string;
+  if (type !== "cost" && p.project_id !== rowProjectId) {
+    return { error: "Project mismatch." };
+  }
   const updates: Record<string, unknown> = {
     entry_date: p.entry_date,
   };
@@ -334,6 +342,10 @@ export async function updateTimelineEntryAction(
         return { error: "Enter a valid amount." };
       }
       if (!category?.trim()) return { error: "Choose a category." };
+      const target = await getProject(user.id, p.project_id);
+      if (!target) {
+        return { error: "Choose a valid project for this expense." };
+      }
       const override = p.cost_title_override?.trim();
       updates.title = override
         ? override
@@ -342,6 +354,7 @@ export async function updateTimelineEntryAction(
         p.description !== undefined ? p.description : row.description;
       updates.amount = amount;
       updates.category = category.trim();
+      updates.project_id = p.project_id;
       break;
     }
     case "revenue": {
@@ -414,17 +427,27 @@ export async function updateTimelineEntryAction(
     .from("timeline_entries")
     .update(updates)
     .eq("id", p.id)
-    .eq("project_id", p.project_id)
     .eq("user_id", user.id);
 
   if (updateErr) {
     return { error: updateErr.message };
   }
 
-  revalidatePath(`/projects/${p.project_id}`);
+  const nextProjectId =
+    typeof updates.project_id === "string"
+      ? updates.project_id
+      : rowProjectId;
+  revalidatePath(`/projects/${rowProjectId}`);
+  if (nextProjectId !== rowProjectId) {
+    revalidatePath(`/projects/${nextProjectId}`);
+  }
   revalidatePath("/dashboard");
   if (type === "distribution" || type === "revenue") {
     revalidatePath("/distribution");
+  }
+  if (type === "cost") {
+    revalidatePath("/costs");
+    revalidatePath("/financials");
   }
   return { success: true };
 }
@@ -456,14 +479,18 @@ export async function deleteTimelineEntryAction(
 
   const { data: row, error: fetchErr } = await supabase
     .from("timeline_entries")
-    .select("id, type")
+    .select("id, type, project_id")
     .eq("id", id)
-    .eq("project_id", project_id)
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (fetchErr || !row) {
     return { error: "Entry not found." };
+  }
+
+  const rowPid = row.project_id as string;
+  if (rowPid !== project_id) {
+    return { error: "Project mismatch." };
   }
 
   const entryType = row.type as string;
@@ -472,17 +499,20 @@ export async function deleteTimelineEntryAction(
     .from("timeline_entries")
     .delete()
     .eq("id", id)
-    .eq("project_id", project_id)
     .eq("user_id", user.id);
 
   if (delErr) {
     return { error: delErr.message };
   }
 
-  revalidatePath(`/projects/${project_id}`);
+  revalidatePath(`/projects/${rowPid}`);
   revalidatePath("/dashboard");
   if (entryType === "distribution" || entryType === "revenue") {
     revalidatePath("/distribution");
+  }
+  if (entryType === "cost") {
+    revalidatePath("/costs");
+    revalidatePath("/financials");
   }
   return { success: true };
 }
