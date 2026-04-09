@@ -4,19 +4,26 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { UserPlan } from "@/types/momentum";
 import { isProPlan } from "@/lib/plan";
-import { UpgradeProDialog } from "@/components/billing/upgrade-pro-dialog";
+import { createClient } from "@/lib/supabase/client";
+import {
+  configureRevenueCatWeb,
+  refreshRevenueCatProEntitlement,
+} from "@/lib/revenuecat/web";
 
 type PlanContextValue = {
   plan: UserPlan;
   isPro: boolean;
   openUpgrade: () => void;
   closeUpgrade: () => void;
+  refreshProStatus: () => Promise<boolean>;
 };
 
 const PlanContext = createContext<PlanContextValue | null>(null);
@@ -28,11 +35,36 @@ export function PlanProvider({
   plan: UserPlan;
   children: ReactNode;
 }) {
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const isPro = isProPlan(plan);
+  const router = useRouter();
+  const [entitlementIsPro, setEntitlementIsPro] = useState(false);
 
-  const openUpgrade = useCallback(() => setUpgradeOpen(true), []);
-  const closeUpgrade = useCallback(() => setUpgradeOpen(false), []);
+  const refreshProStatus = useCallback(async () => {
+    const next = await refreshRevenueCatProEntitlement();
+    setEntitlementIsPro(next);
+    return next;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      await configureRevenueCatWeb(user.id);
+      const next = await refreshRevenueCatProEntitlement();
+      if (!cancelled) setEntitlementIsPro(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isPro = isProPlan(plan) || entitlementIsPro;
+
+  const openUpgrade = useCallback(() => router.push("/upgrade"), [router]);
+  const closeUpgrade = useCallback(() => {}, []);
 
   const value = useMemo(
     () => ({
@@ -40,16 +72,12 @@ export function PlanProvider({
       isPro,
       openUpgrade,
       closeUpgrade,
+      refreshProStatus,
     }),
-    [plan, isPro, openUpgrade, closeUpgrade]
+    [plan, isPro, openUpgrade, closeUpgrade, refreshProStatus]
   );
 
-  return (
-    <PlanContext.Provider value={value}>
-      {children}
-      <UpgradeProDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
-    </PlanContext.Provider>
-  );
+  return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>;
 }
 
 export function usePlan(): PlanContextValue {

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { MomentumLogo } from "@/components/momentum-logo";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DevPlanToggle } from "@/components/settings/dev-plan-toggle";
 import { requireSessionUser, getProfile } from "@/lib/auth/user";
@@ -11,6 +13,7 @@ import {
   isMockDataMode,
   isSupabaseConfigured,
 } from "@/lib/env";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -104,6 +107,28 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-[11px] border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.035)] ring-0">
+        <CardHeader className="border-b border-zinc-100/90 px-5 pb-4 pt-5">
+          <CardTitle className="text-[15px] font-semibold tracking-tight text-zinc-950">
+            Billing
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 px-5 pb-5 pt-5 text-[14px] text-zinc-600">
+          <p>Upgrade to Pro for advanced creator tooling and deeper insights.</p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/upgrade"
+              className={cn(buttonVariants({ size: "sm" }), "rounded-lg")}
+            >
+              Upgrade to Pro
+            </Link>
+            <Button type="button" size="sm" variant="outline" className="rounded-lg" disabled>
+              Manage subscription (coming soon)
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {showDevPlanToggle ? (
         <div className="max-w-xl">

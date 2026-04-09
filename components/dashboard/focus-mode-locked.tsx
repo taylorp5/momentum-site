@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { Crosshair, Lock } from "lucide-react";
-import { usePlan } from "@/components/billing/plan-context";
+import { useProLock } from "@/components/billing/pro-lock";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function FocusModeLocked() {
-  const { openUpgrade } = usePlan();
+  const { onLockedClick } = useProLock();
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16 pt-4">
@@ -48,7 +48,7 @@ export function FocusModeLocked() {
           <Button
             type="button"
             className="h-11 rounded-full bg-zinc-900 px-6 text-[14px] font-semibold hover:bg-zinc-800"
-            onClick={() => openUpgrade()}
+            onClick={() => onLockedClick()}
           >
             Upgrade to Pro
           </Button>
