@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,13 +13,14 @@ import {
 } from "lucide-react";
 import { ProAnalyticsGate } from "@/components/billing/pro-analytics-gate";
 import { usePlan } from "@/components/billing/plan-context";
+import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import {
   dashCard,
   dashCardHeader,
   dashSectionTitle,
 } from "@/components/dashboard/dashboard-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -90,7 +91,7 @@ function dashboardInsight(s: FinancialIntelligenceSnapshot): InsightBlock {
   if (!s.hasActivity) {
     return {
       headline: "No financial activity yet",
-      body: "Log revenue or expenses on your timeline to answer whether you’re making or losing money this month.",
+      body: "Log revenue here or on a project timeline, and expenses from Expenses, to see whether you’re making or losing money this period.",
       variant: "neutral",
     };
   }
@@ -287,10 +288,12 @@ function InsightCard({
   block,
   showActions,
   hasActivity,
+  logRevenueButton,
 }: {
   block: InsightBlock;
   showActions: boolean;
   hasActivity: boolean;
+  logRevenueButton: ReactNode;
 }) {
   const border =
     block.variant === "positive"
@@ -311,15 +314,7 @@ function InsightCard({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           {!hasActivity ? (
             <>
-              <Link
-                href="/dashboard"
-                className={cn(
-                  buttonVariants({ variant: "default", size: "sm" }),
-                  "rounded-lg text-[12px] font-medium no-underline"
-                )}
-              >
-                Log revenue
-              </Link>
+              {logRevenueButton}
               <Link
                 href="/costs"
                 className={cn(
@@ -416,6 +411,40 @@ export function FinancialIntelligenceView({
   const insight = dashboardInsight(s);
   const sortedProjects = sortProjectsForPicker(projects);
 
+  const defaultLogRevenueProjectId =
+    activeProjectFilter !== "all" ? activeProjectFilter : null;
+
+  const logRevenueTrigger = useMemo(
+    () => (
+      <LogRevenueDialog
+        projects={projects}
+        defaultProjectId={defaultLogRevenueProjectId}
+      >
+        <Button
+          size="sm"
+          className="h-8 rounded-lg px-3 text-[12px] font-medium"
+        >
+          Log revenue
+        </Button>
+      </LogRevenueDialog>
+    ),
+    [projects, defaultLogRevenueProjectId]
+  );
+
+  const logRevenueHeaderTrigger = useMemo(
+    () => (
+      <LogRevenueDialog
+        projects={projects}
+        defaultProjectId={defaultLogRevenueProjectId}
+      >
+        <Button size="lg" className="h-9 rounded-lg text-[12px] font-medium">
+          Log revenue
+        </Button>
+      </LogRevenueDialog>
+    ),
+    [projects, defaultLogRevenueProjectId]
+  );
+
   function pushFinancialsQuery(next: { project?: FinancialProjectFilter }) {
     const p = new URLSearchParams();
     if (activeRange !== "this_month") p.set("range", activeRange);
@@ -508,15 +537,18 @@ export function FinancialIntelligenceView({
         title="Financial overview"
         description="Are you making or losing money?"
         action={
-          <Link
-            href="/costs"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "lg" }),
-              "h-9 rounded-lg text-[12px] font-medium no-underline"
-            )}
-          >
-            Manage expenses
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {logRevenueHeaderTrigger}
+            <Link
+              href="/costs"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-9 rounded-lg text-[12px] font-medium no-underline"
+              )}
+            >
+              Manage expenses
+            </Link>
+          </div>
         }
       />
 
@@ -662,6 +694,7 @@ export function FinancialIntelligenceView({
             block={insight}
             showActions={showInsightActions}
             hasActivity={s.hasActivity}
+            logRevenueButton={logRevenueTrigger}
           />
         </ProAnalyticsGate>
       </section>

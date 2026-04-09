@@ -260,7 +260,6 @@ function buildLogPayload(
         return { error: "Enter a valid non-negative amount." };
       }
       const source = values.revenue_source.trim();
-      if (!source) return { error: "Add a revenue source." };
       const rawLink = values.linked_distribution_entry_id?.trim();
       const linked =
         rawLink && z.string().uuid().safeParse(rawLink).success ? rawLink : null;
@@ -272,6 +271,8 @@ function buildLogPayload(
         source,
         linked_distribution_entry_id: linked,
         description: desc,
+        is_recurring: false,
+        recurrence_label: null,
       };
     }
     case "deal": {
@@ -1468,7 +1469,11 @@ export function LogEventDialog({
                     }}
                   >
                     <SelectTrigger className="rounded-lg border-zinc-200">
-                      <SelectValue placeholder="Choose project" />
+                      <SelectValue placeholder="Choose project">
+                        {selectedProject?.name ??
+                          fixedProject?.name ??
+                          "Choose project"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {sortProjectsForExpensePicker(projects ?? []).map((p) => (
@@ -1478,9 +1483,6 @@ export function LogEventDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[11px] leading-relaxed text-zinc-500">
-                    Tie this line to a bet, or use General / overhead for shared costs.
-                  </p>
                 </div>
               ) : null}
               <div className="space-y-2">
@@ -1544,11 +1546,14 @@ export function LogEventDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ev-revenue-source">Source</Label>
+                <Label htmlFor="ev-revenue-source">
+                  Source{" "}
+                  <span className="font-normal text-zinc-500">(optional)</span>
+                </Label>
                 <Input
                   id="ev-revenue-source"
                   className="rounded-lg border-zinc-200"
-                  placeholder="subscriptions"
+                  placeholder="e.g. Gumroad, subscriptions"
                   {...form.register("revenue_source")}
                 />
               </div>

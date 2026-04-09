@@ -120,11 +120,23 @@ const revenueEvent = baseDate
   .extend({
     type: z.literal("revenue"),
     amount: z.number().nonnegative(),
-    source: z.string().min(1).max(120),
+    /** Optional (e.g. Gumroad, Stripe); empty stores as null in DB. */
+    source: z.string().max(120).optional().default(""),
     /** Optional attribution to a distribution timeline row (same project). */
     linked_distribution_entry_id: z.string().uuid().optional().nullable(),
     image_storage_path: z.string().optional().nullable(),
     description: z.string().max(5000).optional().default(""),
+    is_recurring: z.boolean().optional().default(false),
+    recurrence_label: z.string().max(50).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.is_recurring && !data.recurrence_label?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Recurrence label is required for recurring revenue.",
+        path: ["recurrence_label"],
+      });
+    }
   })
   .strict();
 

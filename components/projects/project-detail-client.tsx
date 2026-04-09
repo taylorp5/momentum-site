@@ -16,6 +16,7 @@ import {
 } from "@/components/distribution/rewrite-post-modal";
 import { DistributionPostRoiFooter } from "@/components/distribution/distribution-post-roi-footer";
 import { PlatformIcon } from "@/components/distribution/platform-icon";
+import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
 import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
 import {
@@ -215,6 +216,17 @@ export function ProjectDetailClient({
           >
             All projects
           </Link>
+          <LogRevenueDialog
+            projects={allProjectsForLog}
+            defaultProjectId={project.id}
+          >
+            <Button
+              variant="outline"
+              className="h-10 rounded-[10px] border-zinc-200/90 px-4 text-[13px] font-semibold"
+            >
+              Log revenue
+            </Button>
+          </LogRevenueDialog>
           <Link
             href={`/financials?project=${encodeURIComponent(project.id)}`}
             className={buttonVariants({
@@ -763,13 +775,12 @@ function TimelineFeedCard({
   const financialTitle =
     entry.type === "cost" && entry.amount != null
       ? `💸 ${formatMoney(entry.amount)} — ${entry.category ?? "Cost"}`
-      : entry.type === "revenue" && entry.amount != null
-        ? `💰 ${formatMoney(entry.amount)} — ${entry.revenue_source ?? "Revenue"}`
-        : entry.type === "deal" && entry.revenue_share_percentage != null
-          ? `🤝 ${entry.revenue_share_percentage}% — ${entry.partner_name ?? "Partner"}`
-          : entry.title;
+      : entry.type === "deal" && entry.revenue_share_percentage != null
+        ? `🤝 ${entry.revenue_share_percentage}% — ${entry.partner_name ?? "Partner"}`
+        : entry.title;
 
   const displayTitle = entry.type === "work" ? entry.title : financialTitle;
+  const isRevenueCard = entry.type === "revenue" && entry.amount != null;
 
   const primaryUrl =
     entry.external_url &&
@@ -800,26 +811,63 @@ function TimelineFeedCard({
             </div>
           ) : null}
           <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-zinc-800 ring-1 ring-zinc-200/80 shadow-sm">
-                <BadgeIcon className="size-3.5 shrink-0 text-zinc-600" strokeWidth={1.75} />
-                {presentation.badgeLabel}
-                {entry.type === "distribution" && entry.platform ? (
-                  <span className="font-normal text-zinc-500">
-                    · {DISTRIBUTION_PLATFORM_LABELS[entry.platform]}
-                    {entry.platform === "reddit" && entry.subreddit?.trim() ? (
-                      <> · r/{entry.subreddit.trim()}</>
+            {isRevenueCard ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-zinc-800 ring-1 ring-zinc-200/80 shadow-sm">
+                    <BadgeIcon
+                      className="size-3.5 shrink-0 text-zinc-600"
+                      strokeWidth={1.75}
+                    />
+                    Revenue · {format(new Date(entry.entry_date), "MMM d, yyyy")}
+                  </span>
+                </div>
+                <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-zinc-900">
+                  <span className="tabular-nums text-zinc-950">
+                    {formatMoney(entry.amount!)}
+                  </span>
+                  <span className="font-medium text-zinc-600">
+                    {" "}
+                    · {entry.is_recurring ? "Recurring" : "One-time"}
+                    {entry.is_recurring && entry.recurrence_label?.trim()
+                      ? ` (${entry.recurrence_label.trim()})`
+                      : ""}
+                  </span>
+                </h3>
+                {entry.revenue_source?.trim() ? (
+                  <p className="text-[14px] leading-relaxed text-zinc-600">
+                    <span className="font-semibold text-zinc-800">Source:</span>{" "}
+                    {entry.revenue_source.trim()}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-zinc-800 ring-1 ring-zinc-200/80 shadow-sm">
+                    <BadgeIcon
+                      className="size-3.5 shrink-0 text-zinc-600"
+                      strokeWidth={1.75}
+                    />
+                    {presentation.badgeLabel}
+                    {entry.type === "distribution" && entry.platform ? (
+                      <span className="font-normal text-zinc-500">
+                        · {DISTRIBUTION_PLATFORM_LABELS[entry.platform]}
+                        {entry.platform === "reddit" && entry.subreddit?.trim() ? (
+                          <> · r/{entry.subreddit.trim()}</>
+                        ) : null}
+                      </span>
                     ) : null}
                   </span>
-                ) : null}
-              </span>
-              <span className="text-[12px] font-medium tabular-nums text-zinc-400">
-                {format(new Date(entry.entry_date), "MMM d, yyyy")}
-              </span>
-            </div>
-            <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-zinc-900">
-              {displayTitle}
-            </h3>
+                  <span className="text-[12px] font-medium tabular-nums text-zinc-400">
+                    {format(new Date(entry.entry_date), "MMM d, yyyy")}
+                  </span>
+                </div>
+                <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-zinc-900">
+                  {displayTitle}
+                </h3>
+              </>
+            )}
             {entry.description ? (
               <p
                 className={cn(

@@ -162,6 +162,7 @@ export async function createLogEventAction(
   }
   if (dataToInsert.type === "revenue") {
     revalidatePath("/distribution");
+    revalidatePath("/financials");
   }
   if (dataToInsert.type === "cost") {
     revalidatePath("/costs");
@@ -179,7 +180,9 @@ const updateTimelineEntrySchema = z.object({
   external_url: z.union([z.string().max(2000), z.literal("")]).optional(),
   amount: z.number().nonnegative().optional(),
   category: z.string().min(1).max(80).optional(),
-  revenue_source: z.string().min(1).max(120).optional(),
+  revenue_source: z.union([z.string().max(120), z.literal("")]).optional(),
+  is_recurring: z.boolean().optional(),
+  recurrence_label: z.string().max(50).optional().nullable(),
   partner_name: z.string().min(1).max(200).optional(),
   revenue_share_percentage: z.number().min(0).max(100).optional(),
   platform: distributionPlatformSchema.optional(),
@@ -215,7 +218,7 @@ export async function updateTimelineEntryAction(
   const { data: row, error: fetchErr } = await supabase
     .from("timeline_entries")
     .select(
-      "id, user_id, project_id, type, title, description, external_url, entry_date, platform, metrics, subreddit, amount, category, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, image_url, event_metadata, event_subtype"
+      "id, user_id, project_id, type, title, description, external_url, entry_date, platform, metrics, subreddit, amount, category, is_recurring, recurrence_label, revenue_source, partner_name, revenue_share_percentage, linked_distribution_entry_id, image_url, event_metadata, event_subtype"
     )
     .eq("id", p.id)
     .eq("user_id", user.id)
@@ -359,16 +362,35 @@ export async function updateTimelineEntryAction(
     }
     case "revenue": {
       const amount = p.amount ?? row.amount;
-      const source = p.revenue_source ?? row.revenue_source;
+      const sourceRaw =
+        p.revenue_source !== undefined
+          ? p.revenue_source
+          : (row.revenue_source ?? "");
+      const recurring =
+        p.is_recurring !== undefined
+          ? p.is_recurring
+          : Boolean(row.is_recurring);
+      const recLabel =
+        p.recurrence_label !== undefined
+          ? p.recurrence_label
+          : (row.recurrence_label ?? null);
       if (amount == null || amount < 0) {
         return { error: "Enter a valid amount." };
       }
-      if (!source?.trim()) return { error: "Add a revenue source." };
-      updates.title = `💰 ${formatMoney(amount)} — ${source.trim()}`;
+      if (recurring && !recLabel?.trim()) {
+        return { error: "Add a recurrence label for recurring revenue." };
+      }
+      const src = sourceRaw.trim() || null;
+      const kindLabel = recurring ? "Recurring" : "One-time";
+      updates.title = `💰 ${formatMoney(amount)} — ${kindLabel}${
+        src ? ` — ${src}` : ""
+      }`;
       updates.description =
         p.description !== undefined ? p.description : row.description;
       updates.amount = amount;
-      updates.revenue_source = source.trim();
+      updates.revenue_source = src;
+      updates.is_recurring = recurring;
+      updates.recurrence_label = recurring ? recLabel?.trim() || null : null;
       break;
     }
     case "deal": {
@@ -445,6 +467,9 @@ export async function updateTimelineEntryAction(
   if (type === "distribution" || type === "revenue") {
     revalidatePath("/distribution");
   }
+  if (type === "revenue") {
+    revalidatePath("/financials");
+  }
   if (type === "cost") {
     revalidatePath("/costs");
     revalidatePath("/financials");
@@ -509,6 +534,9 @@ export async function deleteTimelineEntryAction(
   revalidatePath("/dashboard");
   if (entryType === "distribution" || entryType === "revenue") {
     revalidatePath("/distribution");
+  }
+  if (entryType === "revenue") {
+    revalidatePath("/financials");
   }
   if (entryType === "cost") {
     revalidatePath("/costs");

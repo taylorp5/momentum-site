@@ -87,6 +87,12 @@ export function TimelineEntryEditForm({
   );
   const [category, setCategory] = useState(entry.category ?? "");
   const [revenueSource, setRevenueSource] = useState(entry.revenue_source ?? "");
+  const [revenueRecurring, setRevenueRecurring] = useState(
+    Boolean(entry.is_recurring)
+  );
+  const [revenueRecurrenceLabel, setRevenueRecurrenceLabel] = useState(
+    entry.recurrence_label ?? ""
+  );
   const [partnerName, setPartnerName] = useState(entry.partner_name ?? "");
   const [sharePct, setSharePct] = useState(
     entry.revenue_share_percentage != null
@@ -118,6 +124,12 @@ export function TimelineEntryEditForm({
   useEffect(() => {
     setCostProjectId(entry.project_id);
   }, [entry.id, entry.project_id]);
+
+  useEffect(() => {
+    setRevenueRecurring(Boolean(entry.is_recurring));
+    setRevenueRecurrenceLabel(entry.recurrence_label ?? "");
+    setRevenueSource(entry.revenue_source ?? "");
+  }, [entry.id, entry.is_recurring, entry.recurrence_label, entry.revenue_source]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -201,10 +213,18 @@ export function TimelineEntryEditForm({
             toast.error("Enter a valid amount.");
             return;
           }
+          if (revenueRecurring && !revenueRecurrenceLabel.trim()) {
+            toast.error("Add a recurrence label for recurring revenue.");
+            return;
+          }
           payload = {
             ...base,
             amount: n,
             revenue_source: revenueSource.trim(),
+            is_recurring: revenueRecurring,
+            recurrence_label: revenueRecurring
+              ? revenueRecurrenceLabel.trim()
+              : null,
           };
           break;
         }
@@ -419,7 +439,10 @@ export function TimelineEntryEditForm({
                 disabled={disabled || pending}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Project" />
+                  <SelectValue placeholder="Project">
+                    {expenseProjectOptions.find((p) => p.id === costProjectId)
+                      ?.name ?? "Project"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {expenseProjectOptions.map((p) => (
@@ -495,14 +518,45 @@ export function TimelineEntryEditForm({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-[11px] text-zinc-600">Source</Label>
+            <Label className="text-[11px] text-zinc-600">
+              Source{" "}
+              <span className="font-normal text-zinc-400">(optional)</span>
+            </Label>
             <Input
               value={revenueSource}
               onChange={(e) => setRevenueSource(e.target.value)}
+              placeholder="e.g. Gumroad"
               disabled={disabled || pending}
-              required
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] text-zinc-600">Type</Label>
+            <Select
+              value={revenueRecurring ? "recurring" : "one_time"}
+              onValueChange={(v) => setRevenueRecurring(v === "recurring")}
+              disabled={disabled || pending}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="one_time">One-time</SelectItem>
+                <SelectItem value="recurring">Recurring</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {revenueRecurring ? (
+            <div className="space-y-1">
+              <Label className="text-[11px] text-zinc-600">Recurrence</Label>
+              <Input
+                value={revenueRecurrenceLabel}
+                onChange={(e) => setRevenueRecurrenceLabel(e.target.value)}
+                placeholder="e.g. Monthly"
+                disabled={disabled || pending}
+                required
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
 

@@ -116,6 +116,8 @@ export async function applyScreenshotIntakeAction(
               linked_distribution_entry_id: null,
               description: notes || source,
               image_storage_path: d.image_storage_path,
+              is_recurring: false,
+              recurrence_label: null,
             }
           : {
               type: "note" as const,

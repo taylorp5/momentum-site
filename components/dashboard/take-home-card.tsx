@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Handshake, Wallet } from "lucide-react";
+import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,11 +44,11 @@ export function TakeHomeCard({ summary, projects }: TakeHomeCardProps) {
               No financial activity yet
             </p>
             <div className="flex flex-wrap gap-2">
-              <LogEventDialog projects={projects} defaultEventType="revenue">
+              <LogRevenueDialog projects={projects}>
                 <Button className="rounded-lg bg-zinc-900 hover:bg-zinc-800">
                   Log revenue
                 </Button>
-              </LogEventDialog>
+              </LogRevenueDialog>
               <LogEventDialog projects={projects} defaultEventType="cost">
                 <Button variant="outline" className="rounded-lg">
                   Log expense

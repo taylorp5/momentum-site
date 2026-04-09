@@ -189,12 +189,18 @@ function buildInsertRow(
         source_metadata,
       };
     }
-    case "revenue":
+    case "revenue": {
+      const recurring = data.is_recurring ?? false;
+      const src = data.source?.trim() || null;
+      const kindLabel = recurring ? "Recurring" : "One-time";
+      const title = `💰 ${formatMoney(data.amount)} — ${kindLabel}${
+        src ? ` — ${src}` : ""
+      }`;
       return {
         project_id: data.project_id,
         user_id: userId,
         type: "revenue" as const,
-        title: `💰 ${formatMoney(data.amount)} — ${data.source}`,
+        title,
         description: data.description,
         image_url: data.image_storage_path ?? null,
         external_url: null,
@@ -202,19 +208,23 @@ function buildInsertRow(
         ...nullDist,
         amount: data.amount,
         category: null,
-        is_recurring: null,
-        recurrence_label: null,
-        revenue_source: data.source,
+        is_recurring: recurring,
+        recurrence_label: recurring
+          ? data.recurrence_label?.trim() || null
+          : null,
+        revenue_source: src,
         partner_name: null,
         revenue_share_percentage: null,
         linked_distribution_entry_id: data.linked_distribution_entry_id ?? null,
         ...taxonomy("financial", "revenue", {
           amount: data.amount,
-          source: data.source,
+          source: src,
+          is_recurring: recurring,
         }),
         source_type,
         source_metadata,
       };
+    }
     case "deal":
       return {
         project_id: data.project_id,
