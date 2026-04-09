@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, Link2, Plus, StickyNote } from "lucide-react";
+import { ExternalLink, Link2, Maximize2, Plus, StickyNote } from "lucide-react";
 import {
   GenerateFollowUpModal,
   OpenDistributionFollowUpButton,
@@ -19,6 +19,7 @@ import { PlatformIcon } from "@/components/distribution/platform-icon";
 import { LogRevenueDialog } from "@/components/financials/log-revenue-dialog";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
 import { DeleteTimelineEntryDialog } from "@/components/timeline/delete-timeline-entry-dialog";
+import { TimelineImageViewerDialog } from "@/components/timeline/timeline-image-viewer-dialog";
 import {
   TimelineEntryEditForm,
   type ExpenseProjectOption,
@@ -737,6 +738,7 @@ function TimelineFeedCard({
   onUpdated: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const presentation = getTimelineCardPresentation(entry);
   const BadgeIcon = presentation.Icon;
 
@@ -790,24 +792,92 @@ function TimelineFeedCard({
       ? entry.external_url
       : null;
 
+  const hasTimelineImage = Boolean(entry.image_signed_url);
+  const imageViewerTitle =
+    entry.type === "revenue" && entry.amount != null
+      ? `${formatMoney(entry.amount)} · ${entry.is_recurring ? "Recurring" : "One-time"}`
+      : displayTitle;
+
   return (
-    <article className={presentationShellClass(presentation)}>
+    <article
+      className={cn(
+        presentationShellClass(presentation),
+        hasTimelineImage &&
+          "transition-[box-shadow,ring] hover:shadow-md hover:ring-1 hover:ring-zinc-200/70"
+      )}
+    >
+      {hasTimelineImage && entry.image_signed_url ? (
+        <TimelineImageViewerDialog
+          open={imageViewerOpen}
+          onOpenChange={setImageViewerOpen}
+          imageUrl={entry.image_signed_url}
+          imageStoragePath={entry.image_url}
+          title={imageViewerTitle}
+          description={entry.description}
+          entryDate={entry.entry_date}
+        />
+      ) : null}
       <div className="flex flex-col sm:flex-row">
         <div
           className={cn("hidden w-1 shrink-0 sm:block", presentation.accentBarClass)}
           aria-hidden
         />
-        <div className="flex min-w-0 flex-1 flex-col gap-5 p-5 sm:flex-row sm:gap-6 sm:p-6">
-          {(entry.type === "snapshot" || entry.type === "build") &&
-          entry.image_signed_url ? (
-            <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-[10px] bg-zinc-100 ring-1 ring-zinc-200/60 sm:aspect-square sm:max-w-[220px]">
-              <Image
-                src={entry.image_signed_url}
-                alt={entry.title}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, 220px"
-              />
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-5 p-5 sm:flex-row sm:gap-6 sm:p-6",
+            hasTimelineImage && "cursor-pointer"
+          )}
+          role={hasTimelineImage ? "button" : undefined}
+          tabIndex={hasTimelineImage ? 0 : undefined}
+          aria-label={hasTimelineImage ? "Open image viewer" : undefined}
+          onClick={
+            hasTimelineImage
+              ? () => {
+                  setImageViewerOpen(true);
+                }
+              : undefined
+          }
+          onKeyDown={
+            hasTimelineImage
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setImageViewerOpen(true);
+                  }
+                }
+              : undefined
+          }
+        >
+          {hasTimelineImage && entry.image_signed_url ? (
+            <div className="relative w-full shrink-0 sm:max-w-[220px]">
+              <div
+                className={cn(
+                  "relative aspect-[16/10] w-full overflow-hidden rounded-[10px] bg-zinc-100 ring-1 ring-zinc-200/60 transition duration-200",
+                  "sm:aspect-square",
+                  "group/preview hover:ring-2 hover:ring-zinc-300/90"
+                )}
+              >
+                <Image
+                  src={entry.image_signed_url}
+                  alt={entry.title ? `Preview: ${entry.title}` : "Image preview"}
+                  fill
+                  className="object-cover transition duration-300 group-hover/preview:scale-[1.03]"
+                  sizes="(max-width: 640px) 100vw, 220px"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-transparent to-transparent opacity-80 transition group-hover/preview:opacity-100" />
+                <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2 text-[11px] font-semibold text-white drop-shadow">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-black/35 px-2 py-1 backdrop-blur-[2px]">
+                    <Maximize2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    Preview
+                  </span>
+                  <span className="rounded-md bg-black/35 px-2 py-1 text-[10px] font-medium uppercase tracking-wide backdrop-blur-[2px]">
+                    Click to open
+                  </span>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11px] text-zinc-500 sm:text-center">
+                Larger view and download in viewer
+              </p>
             </div>
           ) : null}
           <div className="min-w-0 flex-1 space-y-3">
@@ -903,13 +973,17 @@ function TimelineFeedCard({
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex max-w-full items-center gap-1.5 break-all text-[13px] font-semibold text-zinc-900 underline-offset-4 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {primaryUrl}
                   <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.75} />
                 </a>
               </>
             ) : null}
-            <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <div
+              className="flex flex-wrap justify-end gap-2 pt-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               <DeleteTimelineEntryDialog
                 entryId={entry.id}
                 projectId={entry.project_id}

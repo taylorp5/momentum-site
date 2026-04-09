@@ -24,7 +24,7 @@ const BULLETS = [
   },
   {
     title: "Log posts instantly with AI",
-    body: "Upload a screenshot and auto-fill metrics.",
+    body: "Smart upload reads your screen and helps you log metrics with fewer taps.",
   },
   {
     title: "Get smarter about distribution",

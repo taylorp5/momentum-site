@@ -30,8 +30,7 @@ export function ProPlanNudge({ visible, className }: ProPlanNudgeProps) {
         <div className="min-w-0 space-y-0.5">
           <p className="text-[13px] font-medium text-zinc-900">You&apos;re building momentum</p>
           <p className="text-[13px] font-normal leading-relaxed text-zinc-500">
-            Pro adds AI screenshot reads, trend analytics, and smarter next moves when you&apos;re
-            ready.
+            Pro adds Smart upload, trend analytics, and smarter next moves when you&apos;re ready.
           </p>
         </div>
       </div>

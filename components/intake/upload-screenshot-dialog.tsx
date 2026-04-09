@@ -325,8 +325,8 @@ export function UploadScreenshotDialog({ projects }: Props) {
 
   async function submitTimelineEntry() {
     if (!isPro) {
-      toast.message("Screenshot upload is a Pro feature", {
-        description: "Upgrade to save screenshots to Momentum.",
+      toast.message("Smart upload is a Pro feature", {
+        description: "Upgrade to save images to your timeline with Smart upload.",
       });
       openUpgrade();
       return;
@@ -737,11 +737,11 @@ export function UploadScreenshotDialog({ projects }: Props) {
       <Button
         type="button"
         className="h-8 rounded-lg px-3 text-[12px]"
-        title={!isPro ? "Upgrade to Pro to upload screenshots" : undefined}
+        title={!isPro ? "Upgrade to Pro to use Smart upload" : undefined}
         onClick={() => {
           if (!isPro) {
-            toast.message("Screenshot upload is a Pro feature", {
-              description: "Upgrade to classify and save screenshots.",
+            toast.message("Smart upload is a Pro feature", {
+              description: "Upgrade to classify images and save them to your timeline.",
             });
             openUpgrade();
             return;
@@ -749,7 +749,7 @@ export function UploadScreenshotDialog({ projects }: Props) {
           setOpen(true);
         }}
       >
-        <Upload className="mr-1.5 size-3.5" /> Upload screenshot
+        <Upload className="mr-1.5 size-3.5" /> Smart upload (Beta)
       </Button>
       <Dialog
         open={open}
@@ -760,10 +760,19 @@ export function UploadScreenshotDialog({ projects }: Props) {
       >
         <DialogContent className="max-h-[min(92vh,760px)] overflow-y-auto sm:max-w-[600px] rounded-2xl border-zinc-200/90 p-0 gap-0 shadow-lg">
           <div className="border-b border-zinc-100 bg-zinc-50/80 px-6 py-4">
-            <DialogHeader className="space-y-1 text-left">
-              <DialogTitle className="text-lg font-semibold tracking-tight">Upload screenshot</DialogTitle>
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle className="text-lg font-semibold tracking-tight">
+                Smart upload (Beta)
+              </DialogTitle>
               <DialogDescription className="text-[13px] leading-relaxed text-zinc-600">
-                We classify the image and suggest next steps — nothing is saved until you confirm.
+                <span className="block">
+                  Upload a screenshot, logo, or analytics image. Momentum will suggest what to do
+                  next.
+                </span>
+                <span className="mt-2 block">
+                  This feature is still improving, so you&apos;ll always confirm before anything is
+                  saved.
+                </span>
               </DialogDescription>
             </DialogHeader>
           </div>
