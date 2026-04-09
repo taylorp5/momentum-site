@@ -12,6 +12,7 @@ import {
   startRevenueCatPurchase,
   type RevenueCatCheckoutMode,
 } from "@/lib/revenuecat/web";
+import { createClient } from "@/lib/supabase/client";
 
 const PRO_OUTCOMES = [
   "Track what works across platforms (Reddit, TikTok, etc.)",
@@ -34,7 +35,18 @@ export function UpgradePageClient() {
   async function onUpgrade() {
     setPending(true);
     try {
-      const result = await startRevenueCatPurchase(checkoutMode);
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Sign in to upgrade.");
+        return;
+      }
+      // RevenueCat Web Purchase Links for logged-in users require this id on the URL or checkout 404s.
+      const result = await startRevenueCatPurchase(checkoutMode, {
+        appUserId: user.id,
+      });
       if (result.status === "failed") {
         toast.error(result.message);
         return;

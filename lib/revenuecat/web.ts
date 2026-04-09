@@ -56,12 +56,32 @@ export type RevenueCatPurchaseResult =
   | { status: "failed"; message: string };
 
 /**
+ * Build final Web Purchase Link URL.
+ * @see https://www.revenuecat.com/docs/web/web-billing/web-purchase-links — for identified users,
+ * the App User ID must be appended or RevenueCat returns 404.
+ */
+function buildWebPurchaseLinkUrl(baseUrl: string, appUserId: string | undefined): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  const skipAppend =
+    process.env.NEXT_PUBLIC_RC_WEB_PURCHASE_LINK_SKIP_APP_USER_ID === "true";
+  if (skipAppend) {
+    return trimmed;
+  }
+  const id = appUserId?.trim();
+  if (!id) {
+    return "";
+  }
+  return `${trimmed}/${encodeURIComponent(id)}`;
+}
+
+/**
  * Purchase handler placeholder.
  * - `sdk`: use Offerings + package ids (future wiring).
  * - `purchase_link`: redirect to your RevenueCat Web Purchase Link.
  */
 export async function startRevenueCatPurchase(
-  mode: RevenueCatCheckoutMode
+  mode: RevenueCatCheckoutMode,
+  options?: { appUserId?: string | null }
 ): Promise<RevenueCatPurchaseResult> {
   try {
     if (mode === "sdk") {
@@ -75,11 +95,24 @@ export async function startRevenueCatPurchase(
     }
 
     // TODO: Replace with your RevenueCat Web Purchase Link.
-    const purchaseLink = process.env.NEXT_PUBLIC_RC_WEB_PURCHASE_LINK?.trim() ?? "";
-    if (!purchaseLink) {
-      return { status: "failed", message: "Missing purchase link configuration." };
+    // Template from RevenueCat (Share URL) — usually https://pay.rev.cat/... without the user id.
+    const purchaseLinkBase = process.env.NEXT_PUBLIC_RC_WEB_PURCHASE_LINK?.trim() ?? "";
+    if (!purchaseLinkBase) {
+      return {
+        status: "failed",
+        message:
+          "Add NEXT_PUBLIC_RC_WEB_PURCHASE_LINK in Vercel (RevenueCat Web Purchase Link URL). The API key alone does not start checkout.",
+      };
     }
-    window.location.assign(purchaseLink);
+    const finalUrl = buildWebPurchaseLinkUrl(purchaseLinkBase, options?.appUserId ?? undefined);
+    if (!finalUrl) {
+      return {
+        status: "failed",
+        message:
+          "Sign in to open checkout. RevenueCat needs your App User ID on the link (same as your Supabase user id), or set NEXT_PUBLIC_RC_WEB_PURCHASE_LINK_SKIP_APP_USER_ID=true for anonymous/redemption links only.",
+      };
+    }
+    window.location.assign(finalUrl);
     return { status: "redirected" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Purchase failed.";
