@@ -84,11 +84,23 @@ function mapDbCostRow(
   };
 }
 
-function applyFilters(rows: CostEventRow[], f: CostsFilters): CostEventRow[] {
-  let out = rows;
+function sortRows(rows: CostEventRow[]): CostEventRow[] {
+  return rows.sort(
+    (a, b) =>
+      new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime() ||
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
+function applyProjectScope(rows: CostEventRow[], f: CostsFilters): CostEventRow[] {
   if (f.projectId && f.projectId !== "all") {
-    out = out.filter((r) => r.project_id === f.projectId);
+    return rows.filter((r) => r.project_id === f.projectId);
   }
+  return rows;
+}
+
+function applyLedgerFilters(rows: CostEventRow[], f: CostsFilters): CostEventRow[] {
+  let out = rows;
   if (f.category && f.category !== "all") {
     out = out.filter((r) => (r.category ?? "uncategorized") === f.category);
   }
@@ -112,11 +124,7 @@ function applyFilters(rows: CostEventRow[], f: CostsFilters): CostEventRow[] {
         .includes(q)
     );
   }
-  return out.sort(
-    (a, b) =>
-      new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime() ||
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  return sortRows(out);
 }
 
 export async function getCostsView(userId: string, filters: CostsFilters = {}) {
@@ -202,20 +210,21 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
     }
   }
 
-  const filtered = applyFilters(rows, filters);
+  const projectScopedRows = applyProjectScope(rows, filters);
+  const ledgerRows = applyLedgerFilters(projectScopedRows, filters);
 
   const monthEndIso = utcTodayIso();
-  const totalSpendThisMonth = filtered.reduce(
+  const totalSpendThisMonth = projectScopedRows.reduce(
     (sum, r) => sum + costAmountInPeriod(r, monthStartIso, monthEndIso),
     0
   );
-  const recurringSubscriptionsThisMonth = filtered
+  const recurringSubscriptionsThisMonth = projectScopedRows
     .filter((r) => isRecurringCostRule(r))
     .reduce(
       (sum, r) => sum + costAmountInPeriod(r, monthStartIso, monthEndIso),
       0
     );
-  const oneTimeSpendThisMonth = filtered
+  const oneTimeSpendThisMonth = projectScopedRows
     .filter((r) => !isRecurringCostRule(r))
     .reduce(
       (sum, r) => sum + costAmountInPeriod(r, monthStartIso, monthEndIso),
@@ -224,7 +233,7 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
   const estimatedTakeHomeImpact = totalSpendThisMonth;
 
   const byCategory = new Map<string, number>();
-  for (const row of filtered) {
+  for (const row of projectScopedRows) {
     const key = row.category?.trim() || "uncategorized";
     const amt = costAmountInPeriod(row, monthStartIso, monthEndIso);
     if (amt <= 0) continue;
@@ -235,8 +244,9 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total);
 
-  const categories = [...new Set(rows.map((r) => r.category?.trim() || "uncategorized"))]
-    .sort((a, b) => a.localeCompare(b));
+  const categories = [
+    ...new Set(projectScopedRows.map((r) => r.category?.trim() || "uncategorized")),
+  ].sort((a, b) => a.localeCompare(b));
 
   return {
     totalSpendThisMonth,
@@ -244,7 +254,7 @@ export async function getCostsView(userId: string, filters: CostsFilters = {}) {
     oneTimeSpendThisMonth,
     estimatedTakeHomeImpact,
     categoryBreakdown,
-    rows: filtered,
+    rows: ledgerRows,
     projects,
     categories,
     monthStartIso,

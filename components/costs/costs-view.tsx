@@ -115,6 +115,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
     project === "all"
       ? "All projects"
       : (projects.find((p) => p.id === project)?.name ?? "Unknown project");
+  const monthScopeLabel = `${format(new Date(), "MMMM yyyy")} · ${projectFilterLabel}`;
 
   function apply(
     next: Partial<{
@@ -389,14 +390,9 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           This month at a glance
         </h2>
         <p className="mt-1 text-[14px] text-zinc-600">
-          Your spending snapshot this month, rolled up from the ledger.
+          Monthly summary cards always reflect the current calendar month.
         </p>
-        {project !== "all" ? (
-          <p className="mt-2 text-[13px] font-medium text-zinc-800">
-            Filtered to <span className="text-zinc-950">{projectFilterLabel}</span> — totals match
-            the ledger below.
-          </p>
-        ) : null}
+        <p className="mt-2 text-[12px] font-medium text-zinc-700">{monthScopeLabel}</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
