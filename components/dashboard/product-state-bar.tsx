@@ -1,14 +1,12 @@
 "use client";
 
-import { Activity, BarChart3, Clock3, Plus, Shapes } from "lucide-react";
+import { Activity, BarChart3, Clock3, Flame, Plus, Shapes } from "lucide-react";
 import { PlatformIcon } from "@/components/distribution/platform-icon";
 import { LogEventDialog } from "@/components/timeline/log-event-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { DistributionPlatform, Project } from "@/types/momentum";
-
-const STREAK_EMOJI = "\u{1F525}";
 
 type Props = {
   totalPosts: number;
@@ -35,7 +33,7 @@ function Stat({
   tone?: "neutral" | "accent" | "success";
 }) {
   return (
-    <div className="flex min-w-[120px] items-start gap-2.5">
+    <div className="flex min-w-0 items-start gap-2.5">
       <span
         className={cn(
           "mt-[2px] text-zinc-500",
@@ -45,13 +43,13 @@ function Stat({
       >
         {icon}
       </span>
-      <div className="min-w-0 space-y-0.5">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-[12.5px] font-medium uppercase tracking-[0.04em] text-zinc-600">
           {label}
         </p>
         <p
           className={cn(
-            "truncate text-[20px] font-semibold leading-tight tracking-tight text-zinc-900",
+            "break-words text-[18px] font-semibold leading-snug tracking-tight text-zinc-900 sm:text-[19px]",
             tone === "accent" && "font-semibold text-blue-700",
             tone === "success" && "font-semibold text-emerald-700"
           )}
@@ -74,17 +72,18 @@ export function ProductStateBar({
   projects,
   hasProjects,
 }: Props) {
+  const dayWord = activeStreakDays === 1 ? "day" : "days";
   const streakLabel =
     activeStreakDays > 0
       ? streakPaused
-        ? `${STREAK_EMOJI} ${activeStreakDays} day${activeStreakDays === 1 ? "" : "s"} streak (paused)`
-        : `${STREAK_EMOJI} ${activeStreakDays} day${activeStreakDays === 1 ? "" : "s"} streak`
+        ? `${activeStreakDays} ${dayWord} streak (paused)`
+        : `${activeStreakDays} ${dayWord} streak`
       : "Start your streak";
 
   return (
     <Card className="rounded-xl border border-zinc-200/70 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] ring-0">
       <CardContent className="flex flex-col gap-2.5 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid min-w-0 flex-1 gap-x-4 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fit,minmax(11.5rem,1fr))] gap-x-4 gap-y-3">
           <Stat
             label="Posts shipped"
             value={totalPosts.toLocaleString()}
@@ -116,7 +115,14 @@ export function ProductStateBar({
           <Stat
             label="Active streak"
             value={streakLabel}
-            icon={<span className="text-[16px]">{STREAK_EMOJI}</span>}
+            icon={
+              <Flame
+                className={cn(
+                  "size-4 shrink-0",
+                  activeStreakDays > 0 && streakPaused && "text-amber-600"
+                )}
+              />
+            }
             tone={
               activeStreakDays > 0 ? (streakPaused ? "neutral" : "success") : "neutral"
             }
