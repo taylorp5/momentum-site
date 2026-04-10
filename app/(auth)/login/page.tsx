@@ -30,7 +30,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
     err === "config"
       ? "Email sign-in could not finish — check that Supabase URL and anon key are set on the server."
       : err === "auth"
-        ? "That sign-in link expired or was already used. Request a new one."
+        ? "Sign-in could not finish (link expired or invalid). Try Google again or a new reset email. In Supabase → Authentication → URL configuration, add your redirect URL: https://YOUR_DOMAIN/auth/callback"
         : null;
 
   return (
