@@ -111,10 +111,10 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
     [projects]
   );
 
-  const filteredProjectLabel =
-    project !== "all"
-      ? projects.find((p) => p.id === project)?.name ?? null
-      : null;
+  const projectFilterLabel =
+    project === "all"
+      ? "All projects"
+      : (projects.find((p) => p.id === project)?.name ?? "Unknown project");
 
   function apply(
     next: Partial<{
@@ -186,7 +186,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
             <Label className="text-[11px] font-medium text-zinc-600">Project</Label>
             <Select value={project} onValueChange={(v) => apply({ project: v ?? "all" })}>
               <SelectTrigger className="mt-1 h-10">
-                <SelectValue placeholder="Project" />
+                <SelectValue placeholder="Project">{projectFilterLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All projects</SelectItem>
@@ -311,7 +311,10 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
                     </TableCell>
                     <TableCell className="text-zinc-900">
                       <p className="text-[13px] font-semibold leading-snug tracking-tight">
-                        <span className="text-zinc-950">{row.project_name}</span>
+                                               <span className="text-zinc-950">
+                          {projects.find((p) => p.id === row.project_id)?.name ??
+                            row.project_name}
+                        </span>
                         <span className="font-normal text-zinc-400"> · </span>
                         <span className="tabular-nums">{money.format(row.amount)}</span>
                         <span className="font-normal text-zinc-400"> · </span>
@@ -388,10 +391,10 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
         <p className="mt-1 text-[14px] text-zinc-600">
           Your spending snapshot this month, rolled up from the ledger.
         </p>
-        {filteredProjectLabel ? (
+        {project !== "all" ? (
           <p className="mt-2 text-[13px] font-medium text-zinc-800">
-            Filtered to <span className="text-zinc-950">{filteredProjectLabel}</span> — totals
-            match the ledger below.
+            Filtered to <span className="text-zinc-950">{projectFilterLabel}</span> — totals match
+            the ledger below.
           </p>
         ) : null}
       </div>
