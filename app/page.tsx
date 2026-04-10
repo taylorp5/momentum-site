@@ -148,10 +148,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               "lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] lg:gap-y-10 lg:gap-x-12 xl:gap-x-14"
             )}
           >
-            <div className="max-w-lg space-y-6 lg:max-w-none lg:pr-2 xl:pr-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                For builders shipping in public
-              </p>
+            <div className="max-w-lg space-y-5 lg:max-w-none lg:pr-2 xl:pr-4">
               <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-tight sm:text-5xl sm:leading-[1.05]">
                 Stop guessing what works.
                 <span className="block text-zinc-700">Start building with clarity.</span>
