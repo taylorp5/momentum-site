@@ -36,6 +36,7 @@ export type DistributionPlatform =
   | "reddit"
   | "tiktok"
   | "twitter"
+  | "linkedin"
   | "product_hunt"
   | "instagram"
   | "youtube"

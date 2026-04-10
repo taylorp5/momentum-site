@@ -374,6 +374,7 @@ function detectPlatformFromUrl(raw: string): DistributionPlatform | null {
   ) {
     return "twitter";
   }
+  if (lower.includes("linkedin.com")) return "linkedin";
   if (lower.includes("producthunt.com")) return "product_hunt";
   if (lower.includes("instagram.com")) return "instagram";
   if (lower.includes("youtube.com") || lower.includes("youtu.be"))
@@ -386,6 +387,7 @@ const DISTRIBUTION_SHELL_ACCENT: Record<DistributionPlatform, string> = {
   reddit: "border-t-[3px] border-t-orange-500/45",
   tiktok: "border-t-[3px] border-t-cyan-500/45",
   twitter: "border-t-[3px] border-t-sky-500/45",
+  linkedin: "border-t-[3px] border-t-blue-500/45",
   product_hunt: "border-t-[3px] border-t-orange-600/40",
   instagram: "border-t-[3px] border-t-pink-500/40",
   youtube: "border-t-[3px] border-t-red-500/45",

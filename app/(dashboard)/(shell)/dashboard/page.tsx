@@ -54,6 +54,7 @@ const PLATFORM_VALUES: Array<DistributionPlatform | "all"> = [
   "reddit",
   "tiktok",
   "twitter",
+  "linkedin",
   "product_hunt",
   "instagram",
   "youtube",

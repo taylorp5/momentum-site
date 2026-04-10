@@ -22,6 +22,12 @@ export const PLATFORM_ACCENT: Record<
     ring: "ring-sky-200/80",
     bar: "#7dd3fc",
   },
+  linkedin: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    ring: "ring-blue-200/80",
+    bar: "#93c5fd",
+  },
   product_hunt: {
     bg: "bg-rose-50",
     text: "text-rose-700",

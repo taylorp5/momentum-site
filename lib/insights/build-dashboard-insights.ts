@@ -47,6 +47,7 @@ export const DASHBOARD_INSIGHT_LABELS: Record<DashboardInsight["id"], string> = 
 const TRY_PLATFORM_ORDER: DistributionPlatform[] = [
   "tiktok",
   "twitter",
+  "linkedin",
   "reddit",
   "instagram",
   "youtube",

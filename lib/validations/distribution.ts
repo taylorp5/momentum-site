@@ -4,6 +4,7 @@ export const distributionPlatformSchema = z.enum([
   "reddit",
   "tiktok",
   "twitter",
+  "linkedin",
   "product_hunt",
   "instagram",
   "youtube",

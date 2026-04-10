@@ -34,6 +34,7 @@ function detectPlatform(name: string): DistributionPlatform | undefined {
   if (/\breddit\b/i.test(name)) return "reddit";
   if (/\btiktok\b/i.test(name)) return "tiktok";
   if (/\b(x|twitter)\b/i.test(name)) return "twitter";
+  if (/\blinkedin\b/i.test(name)) return "linkedin";
   if (/product[_-]?hunt/i.test(name)) return "product_hunt";
   if (/\binstagram\b/i.test(name)) return "instagram";
   if (/\byoutube\b/i.test(name)) return "youtube";
