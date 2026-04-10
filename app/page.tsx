@@ -80,10 +80,15 @@ export default async function HomePage() {
         >
           <div
             aria-hidden
-            className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.08),rgba(34,197,94,0.05),transparent_70%)] blur-3xl"
+            className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.1),rgba(34,197,94,0.06),transparent_70%)] blur-3xl"
           />
-          <div className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_minmax(0,1.05fr)] lg:gap-16">
-            <div className="max-w-xl space-y-6">
+          <div
+            className={cn(
+              "relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 sm:gap-12 sm:px-6",
+              "lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] lg:gap-y-10 lg:gap-x-12 xl:gap-x-14"
+            )}
+          >
+            <div className="max-w-lg space-y-6 lg:max-w-none lg:pr-2 xl:pr-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
                 For builders shipping in public
               </p>
@@ -104,17 +109,31 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="relative lg:pl-4">
-              <div className="overflow-hidden rounded-2xl border border-zinc-200/90 bg-zinc-100/60 shadow-[0_24px_56px_-30px_rgba(15,23,42,0.4)] ring-1 ring-zinc-950/[0.04]">
-                <Image
-                  src="/landing/hero-dashboard.jpg"
-                  alt="Momentum dashboard: at a glance metrics, today activity, and views over time"
-                  width={1024}
-                  height={486}
-                  className="h-auto w-full"
-                  priority
-                  sizes="(min-width: 1024px) 640px, 100vw"
-                />
+            <div className="relative min-w-0 w-full lg:-mr-2 xl:-mr-0">
+              <div
+                className={cn(
+                  "overflow-hidden rounded-2xl border border-zinc-200/90 bg-zinc-100/80",
+                  "shadow-[0_32px_72px_-32px_rgba(15,23,42,0.48),0_0_0_1px_rgba(255,255,255,0.6)_inset]",
+                  "ring-1 ring-zinc-950/[0.06]",
+                  "before:pointer-events-none before:absolute before:inset-0 before:z-10 before:rounded-2xl before:shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
+                )}
+              >
+                <div
+                  className={cn(
+                    "relative w-full overflow-hidden",
+                    "aspect-[16/12] min-h-[240px] sm:aspect-[16/10] sm:min-h-[280px]",
+                    "lg:aspect-auto lg:min-h-[400px] lg:max-h-[min(52vh,560px)] xl:min-h-[440px]"
+                  )}
+                >
+                  <Image
+                    src="/landing/hero-dashboard.jpg"
+                    alt="Momentum dashboard: at a glance metrics, today activity, and views over time"
+                    fill
+                    priority
+                    sizes="(min-width: 1280px) 760px, (min-width: 1024px) 62vw, 100vw"
+                    className="object-cover object-top origin-top scale-[1.1]"
+                  />
+                </div>
               </div>
             </div>
           </div>
