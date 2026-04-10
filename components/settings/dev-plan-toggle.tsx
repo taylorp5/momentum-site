@@ -33,47 +33,46 @@ export function DevPlanToggle({ currentPlan }: Props) {
   }
 
   return (
-    <Card className="rounded-[11px] border-amber-200/90 bg-amber-50/40 py-0 shadow-none ring-0">
-      <CardHeader className="border-b border-amber-200/60 px-5 pb-4 pt-5">
+    <Card className="rounded-2xl border border-amber-200/70 bg-amber-50/35 py-0 shadow-none ring-0">
+      <CardHeader className="space-y-1 border-b border-amber-200/50 px-5 pb-4 pt-5">
         <CardTitle className="text-[15px] font-semibold tracking-tight text-amber-950">
-          Development · Plan switch
+          Developer tools
         </CardTitle>
-        <p className="text-[13px] font-normal leading-relaxed text-amber-900/80">
-          Only appears in <code className="rounded bg-white/80 px-1 py-0.5 font-mono text-[11px]">next dev</code>.
-          You can temporarily enable it in hosted environments with{" "}
-          <code className="rounded bg-white/80 px-1 py-0.5 font-mono text-[11px]">
+        <p className="text-[13px] leading-relaxed text-amber-900/75">For testing only</p>
+        <p className="text-[12px] leading-relaxed text-amber-800/70">
+          Switches your <span className="font-medium">profiles.plan</span> in the database. Enable
+          with{" "}
+          <code className="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-amber-950">
             ENABLE_DEV_PLAN_TOGGLE=true
-          </code>
-          . Updates your <span className="font-medium">profiles.plan</span> in Supabase.
+          </code>{" "}
+          outside local dev if needed.
         </p>
       </CardHeader>
       <CardContent className="space-y-4 px-5 pb-5 pt-5">
-        <p className="text-[14px] text-amber-950">
-          Current:{" "}
-          <span className="font-semibold capitalize tabular-nums">
-            {currentPlan}
-          </span>
+        <p className="text-[13px] text-amber-950">
+          Current plan:{" "}
+          <span className="font-semibold capitalize tabular-nums">{currentPlan}</span>
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-9 rounded-lg border-amber-300/80 bg-white text-[13px] font-semibold text-amber-950 hover:bg-amber-50 disabled:opacity-50"
+            className="h-9 rounded-lg border-amber-300/80 bg-white text-[13px] font-medium text-amber-950 hover:bg-amber-50/80 disabled:opacity-50"
             disabled={pending || currentPlan === "free"}
             onClick={() => void setPlan("free")}
           >
-            Free
+            Switch to Free
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-9 rounded-lg border-amber-300/80 bg-white text-[13px] font-semibold text-amber-950 hover:bg-amber-50 disabled:opacity-50"
+            className="h-9 rounded-lg border-amber-300/80 bg-white text-[13px] font-medium text-amber-950 hover:bg-amber-50/80 disabled:opacity-50"
             disabled={pending || currentPlan === "pro"}
             onClick={() => void setPlan("pro")}
           >
-            Pro
+            Switch to Pro
           </Button>
         </div>
       </CardContent>
