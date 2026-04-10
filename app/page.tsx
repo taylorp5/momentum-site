@@ -127,7 +127,7 @@ export default async function HomePage() {
                 >
                   <Image
                     src="/landing/hero-dashboard.jpg"
-                    alt="Momentum dashboard: at a glance metrics, today activity, and views over time"
+                    alt="Momentum dashboard: at a glance metrics, today activity, and performance chart"
                     fill
                     priority
                     sizes="(min-width: 1280px) 760px, (min-width: 1024px) 62vw, 100vw"
