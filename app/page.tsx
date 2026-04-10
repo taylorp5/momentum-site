@@ -20,9 +20,43 @@ import type { DistributionPlatform } from "@/types/momentum";
 
 const sectionClass = "py-14 sm:py-20 md:py-24";
 
-export default async function HomePage() {
+function pickSearchParam(
+  v: string | string[] | undefined
+): string | undefined {
+  if (v === undefined) return undefined;
+  const s = Array.isArray(v) ? v[0] : v;
+  return s === "" ? undefined : s;
+}
+
+type HomePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   if (isMockDataMode()) redirect("/dashboard");
   if (!isSupabaseConfigured()) redirect("/login");
+
+  const sp = await searchParams;
+  const oauthCode = pickSearchParam(sp.code);
+  if (oauthCode) {
+    const nextRaw = pickSearchParam(sp.next);
+    const typeRaw = pickSearchParam(sp.type);
+    let next = "/dashboard";
+    if (typeRaw === "recovery") {
+      next = "/reset-password";
+    } else if (
+      nextRaw &&
+      nextRaw.startsWith("/") &&
+      !nextRaw.startsWith("//") &&
+      !nextRaw.includes("://")
+    ) {
+      next = nextRaw;
+    }
+    redirect(
+      `/auth/callback?code=${encodeURIComponent(oauthCode)}&next=${encodeURIComponent(next)}`
+    );
+  }
+
   const user = await getSessionUser();
   if (user) redirect("/dashboard");
 
