@@ -122,7 +122,7 @@ export default async function HomePage() {
                   className={cn(
                     "relative w-full overflow-hidden",
                     "aspect-[16/12] min-h-[240px] sm:aspect-[16/10] sm:min-h-[280px]",
-                    "lg:aspect-auto lg:min-h-[400px] lg:max-h-[min(52vh,560px)] xl:min-h-[440px]"
+                    "lg:aspect-auto lg:min-h-[420px] lg:max-h-[min(60vh,640px)] xl:min-h-[460px]"
                   )}
                 >
                   <Image
@@ -131,7 +131,7 @@ export default async function HomePage() {
                     fill
                     priority
                     sizes="(min-width: 1280px) 760px, (min-width: 1024px) 62vw, 100vw"
-                    className="object-cover object-top origin-top scale-[1.1]"
+                    className="object-contain object-top"
                   />
                 </div>
               </div>
