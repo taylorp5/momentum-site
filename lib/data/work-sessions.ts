@@ -1,7 +1,11 @@
 import { startOfDay, startOfWeek } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { isMockDataMode, isSupabaseConfigured } from "@/lib/env";
+import { subtractCalendarDays, utcInstantToCalendarYmd } from "@/lib/streak";
 import type { WorkSession } from "@/types/momentum";
+
+const WORK_SESSION_STREAK_BUFFER_DAYS = 14;
+const WORK_SESSION_STREAK_ROW_LIMIT = 3000;
 
 /** Enough history for week/today sums + recent completed; avoids excluding older manual entries. */
 const PROJECT_SESSIONS_LIMIT = 250;
@@ -136,4 +140,33 @@ export async function getRunningWorkSessionBanner(
     durationSeconds: row.duration_seconds,
     lastResumedAt: row.last_resumed_at,
   };
+}
+
+/** Calendar YYYY-MM-DD keys (in `timeZone`) when the user had a work session. */
+export async function collectWorkSessionActivityDatesSince(
+  userId: string,
+  sinceCalendarYmd: string,
+  timeZone: string
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (isMockDataMode() || !isSupabaseConfigured()) {
+    return out;
+  }
+  const since = sinceCalendarYmd.trim().slice(0, 10);
+  const fetchFrom = subtractCalendarDays(since, WORK_SESSION_STREAK_BUFFER_DAYS);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("work_sessions")
+    .select("started_at")
+    .eq("user_id", userId)
+    .gte("started_at", `${fetchFrom}T00:00:00.000Z`)
+    .order("started_at", { ascending: false })
+    .limit(WORK_SESSION_STREAK_ROW_LIMIT);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const iso = (row as { started_at: string }).started_at;
+    const ymd = utcInstantToCalendarYmd(iso, timeZone);
+    if (ymd && ymd >= since) out.add(ymd);
+  }
+  return out;
 }

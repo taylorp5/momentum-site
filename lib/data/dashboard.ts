@@ -13,10 +13,19 @@ import {
   countTimelineEntries,
   countTimelineEntriesSince,
   listCostEntriesForFinancialPeriod,
+  listDistinctTimelineEntryDatesSince,
   listTimelineByTypesSince,
   listRecentTimeline,
+  listTimelineEntriesOnDate,
   listTimelineForProject,
 } from "@/lib/data/timeline";
+import { collectWorkSessionActivityDatesSince } from "@/lib/data/work-sessions";
+import {
+  ACTIVITY_STREAK_LOOKBACK_DAYS,
+  calendarTodayYmdInTimeZone,
+  computeActivityStreak,
+  subtractCalendarDays,
+} from "@/lib/streak";
 import {
   clampIsoRangeToFreeHistory,
   freeHistoryDateFromInclusive,
@@ -144,13 +153,11 @@ export async function getDashboardStats(userId: string) {
 
 export type DashboardProgressSnapshot = {
   activeStreakDays: number;
+  /** True when the streak is intact but today has no activity (yesterday did). */
+  streakPaused: boolean;
   todayCount: number;
   todayBreakdown: string;
 };
-
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function labelForType(t: string): string {
   switch (t) {
@@ -174,17 +181,23 @@ function labelForType(t: string): string {
 }
 
 /**
- * Builder-oriented progress snapshot for dashboard microcopy:
- * - streak counts only when user shipped today
- * - today breakdown keeps to top 3 categories
+ * Builder-oriented progress snapshot: "today" and streaks use `timeZone` (e.g. Vercel
+ * `x-vercel-ip-timezone`). Streaks count consecutive calendar days with timeline activity
+ * (any type, including distribution and financial rows) or work sessions.
  */
 export async function getDashboardProgressSnapshot(
-  userId: string
+  userId: string,
+  timeZone: string
 ): Promise<DashboardProgressSnapshot> {
-  const recent = await listRecentTimeline(userId, 300);
-  const today = todayIsoDate();
+  const todayYmd = calendarTodayYmdInTimeZone(timeZone);
+  const sinceYmd = subtractCalendarDays(todayYmd, ACTIVITY_STREAK_LOOKBACK_DAYS);
 
-  const todayRows = recent.filter((r) => r.entry_date === today);
+  const [todayRows, timelineDates, workDates] = await Promise.all([
+    listTimelineEntriesOnDate(userId, todayYmd),
+    listDistinctTimelineEntryDatesSince(userId, sinceYmd),
+    collectWorkSessionActivityDatesSince(userId, sinceYmd, timeZone),
+  ]);
+
   const todayCount = todayRows.length;
 
   const byType = new Map<string, number>();
@@ -198,21 +211,21 @@ export async function getDashboardProgressSnapshot(
     .map(([k, v]) => `${v} ${k}${v === 1 ? "" : "s"}`)
     .join(" · ");
 
-  // Streak only counts when today has activity.
+  const activeDates = new Set<string>([...timelineDates, ...workDates]);
+  const streak = computeActivityStreak(activeDates, todayYmd);
+
   let activeStreakDays = 0;
-  if (todayCount > 0) {
-    const activeDays = new Set(recent.map((r) => r.entry_date));
-    let d = new Date(`${today}T12:00:00Z`);
-    while (true) {
-      const key = d.toISOString().slice(0, 10);
-      if (!activeDays.has(key)) break;
-      activeStreakDays += 1;
-      d = new Date(d.getTime() - 24 * 60 * 60 * 1000);
-    }
+  let streakPaused = false;
+  if (streak.status === "active") {
+    activeStreakDays = streak.days;
+  } else if (streak.status === "paused") {
+    activeStreakDays = streak.days;
+    streakPaused = true;
   }
 
   return {
     activeStreakDays,
+    streakPaused,
     todayCount,
     todayBreakdown,
   };

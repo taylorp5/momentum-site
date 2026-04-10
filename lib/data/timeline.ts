@@ -63,6 +63,71 @@ export async function listRecentTimeline(
   return (data ?? []) as TimelineEntry[];
 }
 
+/** All timeline rows on a calendar `entry_date` (YYYY-MM-DD). */
+export async function listTimelineEntriesOnDate(
+  userId: string,
+  entryDateYmd: string
+): Promise<TimelineEntry[]> {
+  const y = entryDateYmd.trim().slice(0, 10);
+  if (isMockDataMode()) {
+    return mockTimelineEntries
+      .filter((e) => e.user_id === userId && e.entry_date.slice(0, 10) === y)
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+  }
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  const supabase = await createClient();
+  const ids = await listProjectIds(userId);
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from("timeline_entries")
+    .select(timelineRow)
+    .in("project_id", ids)
+    .eq("entry_date", y)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TimelineEntry[];
+}
+
+/** Distinct calendar days with any timeline activity on/after `sinceDate` (YYYY-MM-DD). */
+export async function listDistinctTimelineEntryDatesSince(
+  userId: string,
+  sinceDate: string
+): Promise<Set<string>> {
+  const dates = new Set<string>();
+  const since = sinceDate.trim().slice(0, 10);
+  if (isMockDataMode()) {
+    for (const e of mockTimelineEntries) {
+      if (e.user_id === userId && e.entry_date >= since) {
+        dates.add(e.entry_date.slice(0, 10));
+      }
+    }
+    return dates;
+  }
+  if (!isSupabaseConfigured()) {
+    return dates;
+  }
+  const supabase = await createClient();
+  const ids = await listProjectIds(userId);
+  if (ids.length === 0) return dates;
+  const { data, error } = await supabase
+    .from("timeline_entries")
+    .select("entry_date")
+    .in("project_id", ids)
+    .gte("entry_date", since)
+    .order("entry_date", { ascending: false })
+    .limit(8000);
+  if (error) throw error;
+  for (const r of data ?? []) {
+    dates.add(String((r as { entry_date: string }).entry_date).slice(0, 10));
+  }
+  return dates;
+}
+
 export async function countTimelineEntries(userId: string): Promise<number> {
   if (isMockDataMode()) {
     return mockTimelineEntries.filter((e) => e.user_id === userId).length;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { formatDistanceToNow } from "date-fns";
 import { BarChart3, FolderKanban, Lightbulb, Sparkles } from "lucide-react";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -33,6 +34,7 @@ import { listDistributionEntries } from "@/lib/data/distribution";
 import { listProjects } from "@/lib/data/projects";
 import { buildDashboardInsights } from "@/lib/insights/build-dashboard-insights";
 import { isProPlan } from "@/lib/plan";
+import { resolveRequestTimeZone } from "@/lib/streak";
 import { redirect } from "next/navigation";
 import { DISTRIBUTION_PLATFORM_LABELS } from "@/lib/constants";
 import type { DistributionPlatform } from "@/types/momentum";
@@ -79,6 +81,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const profile = await getProfile(user.id);
   const isPro = isProPlan(profile?.plan ?? "free");
   const prefs = preferencesFromProfile(profile);
+  const requestHeaders = await headers();
+  const streakTimeZone = resolveRequestTimeZone(requestHeaders);
 
   if (!isPro && (range === "all" || range === "custom")) {
     const sp = new URLSearchParams();
@@ -108,7 +112,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getBestPerformingPost(user.id),
     getYourStorySnapshot(user.id),
     getTakeHomeSummary(user.id),
-    getDashboardProgressSnapshot(user.id),
+    getDashboardProgressSnapshot(user.id, streakTimeZone),
   ]);
 
   const allInsights =
@@ -156,26 +160,37 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
       {hasProjects ? (
         <>
-          <section className="space-y-3">
-            <h2 className={sectionLabelClass}>Today</h2>
-            <ProductStateBar
-              totalPosts={story.totalPosts}
-              totalViews={story.totalViews}
-              bestPlatformLabel={bestPlatformLabel}
-              bestPlatformKey={bestPlatformKey}
-              lastActivityLabel={lastActivityLabel}
-              activeStreakDays={progress.activeStreakDays}
-              projects={projects}
-              hasProjects={hasProjects}
-            />
-            <p className="text-[14px] text-zinc-700">
-              {progress.todayCount === 0
-                ? "Nothing logged today yet. Ship something to build momentum."
-                : `You logged ${progress.todayCount} event${progress.todayCount === 1 ? "" : "s"} today${
-                    progress.todayBreakdown ? ` · ${progress.todayBreakdown}` : ""
-                  }.`}
-            </p>
-          </section>
+          <div className="space-y-4">
+            <section className="space-y-3">
+              <h2 className={sectionLabelClass}>At a glance</h2>
+              <ProductStateBar
+                totalPosts={story.totalPosts}
+                totalViews={story.totalViews}
+                bestPlatformLabel={bestPlatformLabel}
+                bestPlatformKey={bestPlatformKey}
+                lastActivityLabel={lastActivityLabel}
+                activeStreakDays={progress.activeStreakDays}
+                streakPaused={progress.streakPaused}
+                projects={projects}
+                hasProjects={hasProjects}
+              />
+            </section>
+            <section
+              aria-label="Today's activity"
+              className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-3.5"
+            >
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
+                Today
+              </h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-700">
+                {progress.todayCount === 0
+                  ? "Nothing logged today yet. Ship something to build momentum."
+                  : `You logged ${progress.todayCount} event${progress.todayCount === 1 ? "" : "s"} today${
+                      progress.todayBreakdown ? ` · ${progress.todayBreakdown}` : ""
+                    }.`}
+              </p>
+            </section>
+          </div>
 
           {showTrends ? (
             <section className="space-y-2.5">
@@ -261,6 +276,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             bestPlatformKey={bestPlatformKey}
             lastActivityLabel={lastActivityLabel}
             activeStreakDays={progress.activeStreakDays}
+            streakPaused={progress.streakPaused}
             projects={projects}
             hasProjects={false}
           />

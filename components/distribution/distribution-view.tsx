@@ -294,7 +294,9 @@ export function DistributionView({
       <PageHeader
         eyebrow="Growth"
         title="Distribution"
-        description="One ledger for every post and launch â€” filter by project and channel, then lean into what works."
+        description={
+          "One ledger for every post and launch \u2014 filter by project and channel, then lean into what works."
+        }
         action={
           projects.length > 0 ? (
             <AddDistributionDialog projects={projects}>
@@ -326,7 +328,7 @@ export function DistributionView({
               <Input
                 value={searchDraft}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search title, notes, URLâ€¦"
+                placeholder="Search title, notes, URL..."
                 className="h-10 rounded-lg border-zinc-200/85 bg-white pr-3 pl-3 text-[13px] text-zinc-800 placeholder:text-zinc-400/85"
               />
             </div>
@@ -533,7 +535,7 @@ export function DistributionView({
                               </span>
                             ) : (
                               <span className="text-[12px] italic text-zinc-400">
-                                Add notes next time â€” future you will want context.
+                                Add notes next time {"\u2014"} future you will want context.
                               </span>
                             )}
                             <div className="mt-0.5 inline-flex items-baseline gap-1.5">

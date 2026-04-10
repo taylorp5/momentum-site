@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { DistributionPlatform, Project } from "@/types/momentum";
 
+const STREAK_EMOJI = "\u{1F525}";
+
 type Props = {
   totalPosts: number;
   totalViews: number;
@@ -15,6 +17,8 @@ type Props = {
   bestPlatformKey?: DistributionPlatform;
   lastActivityLabel: string;
   activeStreakDays: number;
+  /** Streak length is from yesterday; today has no activity yet. */
+  streakPaused: boolean;
   projects: Project[];
   hasProjects: boolean;
 };
@@ -66,9 +70,17 @@ export function ProductStateBar({
   bestPlatformKey,
   lastActivityLabel,
   activeStreakDays,
+  streakPaused,
   projects,
   hasProjects,
 }: Props) {
+  const streakLabel =
+    activeStreakDays > 0
+      ? streakPaused
+        ? `${STREAK_EMOJI} ${activeStreakDays} day${activeStreakDays === 1 ? "" : "s"} streak (paused)`
+        : `${STREAK_EMOJI} ${activeStreakDays} day${activeStreakDays === 1 ? "" : "s"} streak`
+      : "Start your streak";
+
   return (
     <Card className="rounded-xl border border-zinc-200/70 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] ring-0">
       <CardContent className="flex flex-col gap-2.5 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -103,13 +115,11 @@ export function ProductStateBar({
           />
           <Stat
             label="Active streak"
-            value={
-              activeStreakDays > 0
-                ? `🔥 ${activeStreakDays} day${activeStreakDays === 1 ? "" : "s"}`
-                : "Start your streak today"
+            value={streakLabel}
+            icon={<span className="text-[16px]">{STREAK_EMOJI}</span>}
+            tone={
+              activeStreakDays > 0 ? (streakPaused ? "neutral" : "success") : "neutral"
             }
-            icon={<span className="text-[16px]">🔥</span>}
-            tone={activeStreakDays > 0 ? "success" : "neutral"}
           />
         </div>
 
