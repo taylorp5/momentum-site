@@ -107,13 +107,13 @@ export default async function HomePage() {
             <div className="relative lg:pl-4">
               <div className="overflow-hidden rounded-2xl border border-zinc-200/90 bg-zinc-100/60 shadow-[0_24px_56px_-30px_rgba(15,23,42,0.4)] ring-1 ring-zinc-950/[0.04]">
                 <Image
-                  src="/landing/hero-dashboard.png"
-                  alt="Momentum dashboard: views over time and platform breakdown"
-                  width={892}
-                  height={618}
+                  src="/landing/hero-dashboard.jpg"
+                  alt="Momentum dashboard: at a glance metrics, today activity, and views over time"
+                  width={1024}
+                  height={486}
                   className="h-auto w-full"
                   priority
-                  sizes="(min-width: 1024px) 560px, 100vw"
+                  sizes="(min-width: 1024px) 640px, 100vw"
                 />
               </div>
             </div>
