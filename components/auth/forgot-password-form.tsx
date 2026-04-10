@@ -49,7 +49,7 @@ export function ForgotPasswordForm() {
       const supabase = createClient();
       const origin = window.location.origin;
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
+        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/reset-password")}&type=recovery`,
       });
       if (error) {
         toast.error(error.message);

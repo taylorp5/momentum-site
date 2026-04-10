@@ -25,6 +25,7 @@ export default function AuthCallbackPage() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const next = safeNextPath(params.get("next"));
+    const recoveryHint = params.get("type") === "recovery";
 
     if (!code) {
       router.replace("/login?error=auth");
@@ -36,12 +37,19 @@ export default function AuthCallbackPage() {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
       if (error || !data.session) {
         setStatus("Could not complete sign-in. Redirecting…");
+        if (recoveryHint || next === "/reset-password") {
+          await supabase.auth.signOut();
+        }
         router.replace("/login?error=auth");
         return;
       }
 
       let dest = next;
-      if (isPasswordRecoveryAccessToken(data.session.access_token)) {
+      if (
+        recoveryHint ||
+        isPasswordRecoveryAccessToken(data.session.access_token) ||
+        next === "/reset-password"
+      ) {
         dest = "/reset-password";
       }
 

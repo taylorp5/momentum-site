@@ -1,5 +1,5 @@
 /** Base64url JWT payload segment → JSON (works in browser and Node). */
-function decodeJwtPayload(token: string): { amr?: unknown } | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const part = token.split(".")[1];
     if (!part) return null;
@@ -7,23 +7,32 @@ function decodeJwtPayload(token: string): { amr?: unknown } | null {
     const pad = base64.length % 4 ? 4 - (base64.length % 4) : 0;
     base64 += "=".repeat(pad);
     const json = atob(base64);
-    return JSON.parse(json) as { amr?: unknown };
+    return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
-/** Password recovery sessions often include `amr` containing `recovery` (OAuth uses other values). */
+function amrEntryIsRecovery(entry: unknown): boolean {
+  if (entry === "recovery") return true;
+  if (entry && typeof entry === "object" && "method" in entry) {
+    const m = (entry as { method?: unknown }).method;
+    return m === "recovery";
+  }
+  return false;
+}
+
+/** Password recovery JWTs usually include `amr` with method `recovery` (often as objects, not plain strings). */
 export function isPasswordRecoveryAccessToken(accessToken: string | undefined): boolean {
   if (!accessToken) return false;
   const payload = decodeJwtPayload(accessToken);
   if (!payload) return false;
   const amr = payload.amr;
   if (Array.isArray(amr)) {
-    return amr.some((x) => x === "recovery");
+    return amr.some(amrEntryIsRecovery);
   }
   if (typeof amr === "string") {
     return amr === "recovery";
   }
-  return false;
+  return amrEntryIsRecovery(amr);
 }

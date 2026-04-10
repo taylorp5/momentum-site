@@ -53,9 +53,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     ) {
       next = nextRaw;
     }
-    redirect(
-      `/auth/callback?code=${encodeURIComponent(oauthCode)}&next=${encodeURIComponent(next)}`
-    );
+    const qs = new URLSearchParams();
+    qs.set("code", oauthCode);
+    qs.set("next", next);
+    if (typeRaw === "recovery") {
+      qs.set("type", "recovery");
+    }
+    redirect(`/auth/callback?${qs.toString()}`);
   }
 
   const user = await getSessionUser();
