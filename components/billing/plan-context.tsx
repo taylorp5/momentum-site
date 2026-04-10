@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import type { UserPlan } from "@/types/momentum";
 import { isProPlan } from "@/lib/plan";
 import { createClient } from "@/lib/supabase/client";
+import { syncPlanWithRevenueCatAction } from "@/app/actions/sync-revenuecat-plan";
 import {
   configureRevenueCatWeb,
   refreshRevenueCatProEntitlement,
@@ -41,8 +42,12 @@ export function PlanProvider({
   const refreshProStatus = useCallback(async () => {
     const next = await refreshRevenueCatProEntitlement();
     setEntitlementIsPro(next);
+    const res = await syncPlanWithRevenueCatAction();
+    if (res.synced) {
+      router.refresh();
+    }
     return next;
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,11 +60,16 @@ export function PlanProvider({
       await configureRevenueCatWeb(user.id);
       const next = await refreshRevenueCatProEntitlement();
       if (!cancelled) setEntitlementIsPro(next);
+      const serverSaysPro = isProPlan(plan);
+      if (!cancelled && next !== serverSaysPro) {
+        const res = await syncPlanWithRevenueCatAction();
+        if (res.synced) router.refresh();
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router, plan]);
 
   const isPro = isProPlan(plan) || entitlementIsPro;
 

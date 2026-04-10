@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AccountSettingsSection } from "@/components/settings/account-settings-section";
-import { DevPlanToggle } from "@/components/settings/dev-plan-toggle";
 import { PlanBillingSection } from "@/components/settings/plan-billing-section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSessionUser, getProfile } from "@/lib/auth/user";
 import { listProjects } from "@/lib/data/projects";
-import { isDevPlanToggleEnabled } from "@/lib/env";
 import { planFromProfile } from "@/lib/plan";
 
 export const metadata: Metadata = {
@@ -30,7 +28,6 @@ export default async function SettingsPage() {
     listProjects(user.id),
   ]);
   const plan = planFromProfile(profile);
-  const showDevPlanToggle = isDevPlanToggleEnabled();
   const defaultProject = firstWorkspaceProject(projects);
   const displayName = profile?.display_name?.trim() ?? "";
 
@@ -107,15 +104,6 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </section>
-
-      {showDevPlanToggle ? (
-        <section className="space-y-3 border-t border-dashed border-zinc-200 pt-10">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800/80">
-            Developer
-          </h2>
-          <DevPlanToggle currentPlan={plan} />
-        </section>
-      ) : null}
     </div>
   );
 }
