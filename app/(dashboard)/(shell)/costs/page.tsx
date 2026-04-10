@@ -39,7 +39,6 @@ export default async function CostsPage({ searchParams }: PageProps) {
         totalSpendThisMonth: costs.totalSpendThisMonth,
         recurringSubscriptionsThisMonth: costs.recurringSubscriptionsThisMonth,
         oneTimeSpendThisMonth: costs.oneTimeSpendThisMonth,
-        estimatedTakeHomeImpact: costs.estimatedTakeHomeImpact,
         categoryBreakdown: costs.categoryBreakdown,
       }}
       rows={costs.rows}

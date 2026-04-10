@@ -38,7 +38,6 @@ type CostsViewProps = {
     totalSpendThisMonth: number;
     recurringSubscriptionsThisMonth: number;
     oneTimeSpendThisMonth: number;
-    estimatedTakeHomeImpact: number;
     categoryBreakdown: Array<{ category: string; total: number }>;
   };
   rows: CostEventRow[];
@@ -396,7 +395,7 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
           </p>
         ) : null}
       </div>
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
         <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <CardContent className="p-5">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
@@ -424,16 +423,6 @@ export function CostsView({ summary, rows, projects, categories }: CostsViewProp
             </p>
             <p className="mt-2 tabular-nums text-[1.5rem] font-semibold text-zinc-950">
               {money.format(summary.oneTimeSpendThisMonth)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg border-zinc-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <CardContent className="p-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
-              Estimated take-home impact
-            </p>
-            <p className="mt-2 tabular-nums text-[1.5rem] font-semibold text-zinc-950">
-              {money.format(summary.estimatedTakeHomeImpact)}
             </p>
           </CardContent>
         </Card>
