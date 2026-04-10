@@ -39,14 +39,32 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   if (!isSupabaseConfigured()) redirect("/login");
 
   const sp = await searchParams;
+  const recoveryTokenHash = pickSearchParam(sp.token_hash);
+  const typeParam = pickSearchParam(sp.type);
+  if (recoveryTokenHash && typeParam === "recovery") {
+    redirect(
+      `/reset-password?token_hash=${encodeURIComponent(recoveryTokenHash)}&type=recovery`
+    );
+  }
+
   const oauthCode = pickSearchParam(sp.code);
   if (oauthCode) {
     const nextRaw = pickSearchParam(sp.next);
     const typeRaw = pickSearchParam(sp.type);
+    const recoveryFromLink =
+      typeRaw === "recovery" ||
+      nextRaw === "/reset-password" ||
+      nextRaw?.startsWith("/reset-password");
+
+    if (recoveryFromLink) {
+      const qs = new URLSearchParams();
+      qs.set("code", oauthCode);
+      qs.set("type", "recovery");
+      redirect(`/reset-password?${qs.toString()}`);
+    }
+
     let next = "/dashboard";
-    if (typeRaw === "recovery") {
-      next = "/reset-password";
-    } else if (
+    if (
       nextRaw &&
       nextRaw.startsWith("/") &&
       !nextRaw.startsWith("//") &&
@@ -57,14 +75,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     const qs = new URLSearchParams();
     qs.set("code", oauthCode);
     qs.set("next", next);
-    if (typeRaw === "recovery") {
-      qs.set("type", "recovery");
-    }
     redirect(`/auth/callback?${qs.toString()}`);
   }
 
   const user = await getSessionUser();
-  if (user) redirect("/dashboard");
 
   const steps = [
     {

@@ -54,7 +54,6 @@ export default function AuthCallbackPage() {
       }
 
       router.replace(dest);
-      router.refresh();
     })();
   }, [router]);
 

@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 /**
- * Marketing `/` used to redirect signed-in users on the server. That ran before the
- * client could read `location.hash` (implicit recovery / magic-link tokens), so
- * recovery could never complete. Defer the dashboard redirect to the client when the
- * URL does not show an obvious auth handoff.
+ * Marketing `/` must not use `redirect("/dashboard")` on the server while the user is
+ * signed in: Next will prefetch `/` from auth pages (e.g. reset-password logo link),
+ * and that prefetch would return a redirect to `/dashboard`, which can interrupt the
+ * reset flow. Defer the dashboard redirect to the client on `/` only.
  */
 export function HomeDeferredDashboardRedirect({ isLoggedIn }: { isLoggedIn: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoggedIn || typeof window === "undefined") return;
+    if (pathname !== "/" || !isLoggedIn || typeof window === "undefined") return;
 
     const search = new URLSearchParams(window.location.search);
     if (search.get("code") || search.get("token_hash")) return;
@@ -22,7 +23,7 @@ export function HomeDeferredDashboardRedirect({ isLoggedIn }: { isLoggedIn: bool
     if (hash.includes("access_token") || hash.includes("type=recovery")) return;
 
     router.replace("/dashboard");
-  }, [isLoggedIn, router]);
+  }, [pathname, isLoggedIn, router]);
 
   return null;
 }

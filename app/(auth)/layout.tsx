@@ -16,6 +16,7 @@ export default function AuthLayout({
         <div className="mx-auto flex h-[4.25rem] max-w-lg items-center px-5 sm:px-6">
           <Link
             href="/"
+            prefetch={false}
             className="outline-none transition-opacity hover:opacity-90 focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-zinc-400/80"
           >
             <MomentumLogo size="lg" />

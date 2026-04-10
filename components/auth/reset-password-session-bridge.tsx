@@ -29,10 +29,8 @@ export function ResetPasswordSessionBridge() {
         });
         if (!error) {
           router.replace("/reset-password");
-          router.refresh();
         } else {
           router.replace("/login?error=auth");
-          router.refresh();
         }
       })();
       return;
@@ -47,10 +45,8 @@ export function ResetPasswordSessionBridge() {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
         router.replace("/reset-password");
-        router.refresh();
       } else {
         router.replace("/login?error=auth");
-        router.refresh();
       }
     })();
   }, [router]);
