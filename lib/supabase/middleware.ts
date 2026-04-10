@@ -43,6 +43,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  const code = request.nextUrl.searchParams.get("code");
+
+  if (code && path === "/dashboard") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/auth/callback";
+    if (!redirectUrl.searchParams.has("next")) {
+      redirectUrl.searchParams.set("next", "/dashboard");
+    }
+    return NextResponse.redirect(redirectUrl);
+  }
 
   if (!user && !isPublicPath(path)) {
     const redirectUrl = request.nextUrl.clone();
