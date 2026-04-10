@@ -28,7 +28,11 @@ export function ResetPasswordSessionBridge() {
           type: "recovery",
         });
         if (!error) {
-          router.replace("/reset-password");
+          if (typeof window !== "undefined" && window.location.pathname === "/reset-password") {
+            window.history.replaceState(null, "", "/reset-password");
+          } else {
+            router.replace("/reset-password");
+          }
         } else {
           router.replace("/login?error=auth");
         }
@@ -44,7 +48,11 @@ export function ResetPasswordSessionBridge() {
       const supabase = createClient();
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
-        router.replace("/reset-password");
+        if (typeof window !== "undefined" && window.location.pathname === "/reset-password") {
+          window.history.replaceState(null, "", "/reset-password");
+        } else {
+          router.replace("/reset-password");
+        }
       } else {
         router.replace("/login?error=auth");
       }

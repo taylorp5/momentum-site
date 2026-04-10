@@ -40,7 +40,6 @@ export function LandingImplicitAuthBridge() {
       } else {
         router.replace("/dashboard");
       }
-      router.refresh();
     })();
   }, [router]);
 

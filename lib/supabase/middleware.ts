@@ -45,6 +45,10 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const code = request.nextUrl.searchParams.get("code");
 
+  if (path === "/reset-password" || path.startsWith("/reset-password/")) {
+    return supabaseResponse;
+  }
+
   if (code && path === "/dashboard") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth/callback";

@@ -1,0 +1,30 @@
+diff --git a/node_modules/@supabase/ssr/dist/main/createBrowserClient.js b/node_modules/@supabase/ssr/dist/main/createBrowserClient.js
+index 62bb09e..7381914 100644
+--- a/node_modules/@supabase/ssr/dist/main/createBrowserClient.js
++++ b/node_modules/@supabase/ssr/dist/main/createBrowserClient.js
+@@ -37,7 +37,9 @@ function createBrowserClient(supabaseUrl, supabaseKey, options) {
+                 : null),
+             flowType: "pkce",
+             autoRefreshToken: (0, utils_1.isBrowser)(),
+-            detectSessionInUrl: (0, utils_1.isBrowser)(),
++            detectSessionInUrl: typeof options?.auth?.detectSessionInUrl === "boolean"
++                ? options.auth.detectSessionInUrl
++                : (0, utils_1.isBrowser)(),
+             persistSession: true,
+             storage,
+             ...(options?.cookies &&
+diff --git a/node_modules/@supabase/ssr/dist/module/createBrowserClient.js b/node_modules/@supabase/ssr/dist/module/createBrowserClient.js
+index 5049301..ae77791 100644
+--- a/node_modules/@supabase/ssr/dist/module/createBrowserClient.js
++++ b/node_modules/@supabase/ssr/dist/module/createBrowserClient.js
+@@ -34,7 +34,9 @@ export function createBrowserClient(supabaseUrl, supabaseKey, options) {
+                 : null),
+             flowType: "pkce",
+             autoRefreshToken: isBrowser(),
+-            detectSessionInUrl: isBrowser(),
++            detectSessionInUrl: typeof options?.auth?.detectSessionInUrl === "boolean"
++                ? options.auth.detectSessionInUrl
++                : isBrowser(),
+             persistSession: true,
+             storage,
+             ...(options?.cookies &&
