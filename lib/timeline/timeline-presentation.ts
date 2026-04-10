@@ -71,7 +71,7 @@ function financialBadgeLabel(entry: TimelineEntry): string {
   const st = entry.event_subtype;
   if (st === "cost" || entry.type === "cost") return "Cost";
   if (st === "revenue" || entry.type === "revenue") return "Revenue";
-  if (st === "deal" || entry.type === "deal") return "Deal";
+  if (st === "deal" || entry.type === "deal") return "Deal · Coming soon";
   return "Financial";
 }
 

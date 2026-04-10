@@ -355,7 +355,7 @@ const CONTEXT_EVENT_TITLE: Partial<Record<TimelineEntryType, string>> = {
   distribution: "Log post",
   cost: "Log cost",
   revenue: "Log revenue",
-  deal: "Log deal",
+  deal: "Log deal (coming soon)",
   note: "Note",
   link: "Link",
   snapshot: "Snapshot (image)",
@@ -401,7 +401,7 @@ function contextDialogDescription(t: TimelineEntryType): string {
     case "revenue":
       return "Log revenue — it feeds your timeline and take-home summary.";
     case "deal":
-      return "Record a partner deal and revenue share.";
+      return "Record a partner deal — revenue share controls are coming soon.";
     default:
       return "One entry on your timeline. Posts you log here also show on Distribution.";
   }
@@ -415,7 +415,7 @@ const PRIMARY_TYPE_OPTIONS: Array<{
   { value: "distribution", label: "Post / share something", icon: Megaphone },
   { value: "cost", label: "Cost", icon: Wallet },
   { value: "revenue", label: "Revenue", icon: WalletCards },
-  { value: "deal", label: "Deal", icon: Handshake },
+  { value: "deal", label: "Deal (coming soon)", icon: Handshake },
   { value: "build", label: "Build / progress", icon: Hammer },
   { value: "insight", label: "Insight", icon: Brain },
 ];
@@ -1708,6 +1708,10 @@ export function LogEventDialog({
           ) : null}
           {effectiveType === "deal" ? (
             <>
+              <p className="rounded-lg border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-[12px] leading-relaxed text-zinc-600">
+                Partner revenue share is coming soon. You can still log a deal for your records;
+                fuller modeling arrives in a future update.
+              </p>
               <div className="space-y-2">
                 <Label htmlFor="ev-partner-name">Deal name</Label>
                 <Input
@@ -1718,9 +1722,9 @@ export function LogEventDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ev-share">Value</Label>
+                <Label htmlFor="ev-share">Revenue share % · Coming soon</Label>
                 <p className="text-[11px] text-zinc-500">
-                  Revenue share percentage (0–100).
+                  Percentage of gross revenue (0–100). Refined partner tools are on the way.
                 </p>
                 <Input
                   id="ev-share"

@@ -670,6 +670,9 @@ export function TimelineEntryEditForm({
 
       {entry.type === "deal" ? (
         <>
+          <p className="rounded-md border border-zinc-200/80 bg-zinc-50 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-600">
+            Revenue share modeling is coming soon. Edits here still update your timeline entry.
+          </p>
           <div className="space-y-1">
             <Label className="text-[11px] text-zinc-600">Deal name</Label>
             <Input
@@ -680,7 +683,7 @@ export function TimelineEntryEditForm({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-[11px] text-zinc-600">Value (%)</Label>
+            <Label className="text-[11px] text-zinc-600">Revenue share % · Coming soon</Label>
             <Input
               type="number"
               min={0}

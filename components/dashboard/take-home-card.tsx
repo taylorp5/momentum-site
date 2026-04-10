@@ -74,11 +74,9 @@ export function TakeHomeCard({ summary, projects }: TakeHomeCardProps) {
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-600">
             <Handshake className="size-3.5 text-zinc-500" strokeWidth={1.8} />
-            Revenue share ({summary.revenueSharePercent.toFixed(1)}%)
+            Revenue share · Coming soon
           </span>
-          <span className="text-right text-[14px] font-semibold tabular-nums text-zinc-950">
-            -{money.format(summary.revenueShare)}
-          </span>
+          <span className="text-right text-[13px] font-medium text-zinc-500">Coming soon</span>
         </div>
 
         <div className={`flex items-center justify-between rounded-lg px-3 py-2.5 ring-1 ${takeHomeTone}`}>
@@ -87,10 +85,13 @@ export function TakeHomeCard({ summary, projects }: TakeHomeCardProps) {
             Take home
           </span>
           <span className="text-right text-[20px] font-bold tabular-nums">
-            {money.format(summary.takeHome)}
+            {money.format(summary.revenue - summary.costs)}
           </span>
         </div>
         <p className="text-[12px] text-zinc-600">{summary.insight}</p>
+        <p className="text-[11px] leading-relaxed text-zinc-500">
+          Partner revenue share is coming soon. Take-home here is revenue minus expenses (same period).
+        </p>
       </CardContent>
     </Card>
   );

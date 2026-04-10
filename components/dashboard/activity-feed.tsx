@@ -51,7 +51,7 @@ function timelineKindLabel(type: TimelineEntryType) {
     case "revenue":
       return "Finance · Revenue";
     case "deal":
-      return "Finance · Deal";
+      return "Finance · Deal (coming soon)";
     default:
       return "Ship log";
   }

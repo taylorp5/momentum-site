@@ -168,7 +168,7 @@ function buildInsight(
   costs: number
 ): string {
   if (!hasActivity) {
-    return "Log revenue, expenses, and any partner deals on your timeline to see a full picture.";
+    return "Log revenue and expenses on your timeline to see a full picture. Partner revenue share tools are coming soon.";
   }
   if (net > 0) {
     return "Net income is positive for this period — you are keeping more than you are paying out.";

@@ -122,7 +122,7 @@ function dashboardInsight(s: FinancialIntelligenceSnapshot): InsightBlock {
   if (net > 0) {
     return {
       headline: "You’re profitable",
-      body: "You’ve earned more than you’ve spent this period, after costs and partner share.",
+      body: "You’ve earned more than you’ve spent this period, after costs.",
       variant: "positive",
     };
   }
@@ -138,7 +138,7 @@ function dashboardInsight(s: FinancialIntelligenceSnapshot): InsightBlock {
   if (net < 0) {
     return {
       headline: "You’re losing money this period",
-      body: "After revenue, expenses, and partner share, net income is negative. Use the breakdowns to see where money goes.",
+      body: "After revenue and expenses, net income is negative. Use the breakdowns to see where money goes.",
       variant: "negative",
     };
   }
@@ -249,12 +249,15 @@ function MetricMini({
   accent,
   icon,
   subline,
+  valueClassName,
 }: {
   label: string;
   value: string;
   accent: "revenue" | "costs" | "share";
   icon: ReactNode;
   subline?: string;
+  /** e.g. muted styling for “Coming soon” */
+  valueClassName?: string;
 }) {
   const accentRing =
     accent === "revenue"
@@ -289,7 +292,12 @@ function MetricMini({
         </span>
         <span className={cn("rounded-md p-1", accentBg)}>{icon}</span>
       </div>
-      <p className="mt-3 text-[22px] font-semibold tabular-nums tracking-tight text-zinc-950 sm:text-2xl">
+      <p
+        className={cn(
+          "mt-3 text-[22px] font-semibold tabular-nums tracking-tight sm:text-2xl",
+          valueClassName ?? "text-zinc-950"
+        )}
+      >
         {value}
       </p>
       {subline ? <p className="mt-1 text-[11px] text-zinc-500">{subline}</p> : null}
@@ -504,49 +512,14 @@ export function FinancialIntelligenceView({
       <Card className={cn(dashCard, "border-zinc-200/50 bg-zinc-50/20 py-0 shadow-none lg:col-span-2")}>
         <CardHeader className={cn(dashCardHeader, "border-b border-zinc-100/80 bg-transparent pb-3")}>
           <CardTitle className={cn(dashSectionTitle, "text-[13px] font-semibold text-zinc-600")}>
-            Partner revenue share
+            Partner revenue share · Coming soon
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 px-5 pb-6 pt-4">
-          {s.dealRows.length === 0 ? (
-            <p className="text-[12px] text-zinc-500">
-              No deal events — add partner agreements with a revenue share % to model deductions.
-            </p>
-          ) : (
-            <>
-              <ul className="divide-y divide-zinc-100/90">
-                {s.dealRows.map((d) => (
-                  <li
-                    key={d.id}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-zinc-800">{d.partnerName}</p>
-                      <p className="text-[11px] tabular-nums text-zinc-500">
-                        {d.percent.toFixed(1)}% of gross · {d.entryDate}
-                      </p>
-                    </div>
-                    <span className="text-[13px] font-semibold tabular-nums text-zinc-700">
-                      −{money.format(d.nominalDeduction)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200/70 bg-white/80 px-3 py-2.5">
-                <span className="text-[11px] font-medium text-zinc-600">
-                  Applied ({s.combinedSharePercent.toFixed(1)}% combined)
-                </span>
-                <span className="text-[13px] font-bold tabular-nums text-zinc-900">
-                  −{money.format(s.revenueShareDeduction)}
-                </span>
-              </div>
-              {s.shareRatesCapped ? (
-                <p className="text-[11px] leading-relaxed text-amber-800">
-                  Partner rates sum above 100%; applied share is capped at gross revenue.
-                </p>
-              ) : null}
-            </>
-          )}
+        <CardContent className="space-y-2 px-5 pb-6 pt-4">
+          <p className="text-[13px] leading-relaxed text-zinc-600">
+            Dedicated partner and revenue-share modeling is on the way. Net income above still
+            reflects your timeline today; fuller controls will land here soon.
+          </p>
         </CardContent>
       </Card>
     </div>
@@ -665,13 +638,19 @@ export function FinancialIntelligenceView({
         </p>
       </div>
 
-      <NetIncomeHero
-        net={s.netIncome}
-        hasActivity={s.hasActivity}
-        grossRevenue={s.grossRevenue}
-        totalCosts={s.totalCosts}
-        periodLabel={s.periodLabel}
-      />
+      <div className="space-y-2">
+        <NetIncomeHero
+          net={s.netIncome}
+          hasActivity={s.hasActivity}
+          grossRevenue={s.grossRevenue}
+          totalCosts={s.totalCosts}
+          periodLabel={s.periodLabel}
+        />
+        <p className="text-[11px] leading-relaxed text-zinc-500">
+          Partner revenue share controls are coming soon. Net income may still reflect deal rates
+          logged on your timeline.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricMini
@@ -687,19 +666,12 @@ export function FinancialIntelligenceView({
           icon={<ArrowDownRight className="size-4 text-orange-600" strokeWidth={2} />}
         />
         <MetricMini
-          label="Revenue share"
-          value={
-            s.revenueShareDeduction > 0
-              ? `−${money.format(s.revenueShareDeduction)}`
-              : money.format(0)
-          }
+          label="Revenue share · Coming soon"
+          value="Coming soon"
+          valueClassName="text-[17px] font-medium normal-case tracking-normal text-zinc-500 sm:text-[18px]"
           accent="share"
           icon={<Handshake className="size-4 text-violet-600" strokeWidth={2} />}
-          subline={
-            s.combinedSharePercent > 0
-              ? `${s.combinedSharePercent.toFixed(1)}% of gross · matches dashboard take-home`
-              : "No partner share logged this period"
-          }
+          subline="Partner deductions and reporting will live here."
         />
       </div>
 
@@ -853,7 +825,7 @@ export function FinancialIntelligenceView({
 
       <div className="space-y-4 border-t border-zinc-100/80 pt-8">
         <p className="text-center text-[11px] leading-relaxed text-zinc-400 sm:text-left">
-          Net income = revenue − costs − revenue share.{" "}
+          Net income = revenue − costs. Partner revenue share tools are coming soon.{" "}
           <Link href="/costs" className="text-zinc-600 underline-offset-2 hover:underline">
             Log spending on Expenses
           </Link>
