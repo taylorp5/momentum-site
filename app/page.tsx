@@ -8,6 +8,7 @@ import {
   Package,
   Wallet,
 } from "lucide-react";
+import { LandingImplicitAuthBridge } from "@/components/auth/landing-implicit-auth-bridge";
 import { PlatformIcon } from "@/components/distribution/platform-icon";
 import { MomentumLogo } from "@/components/momentum-logo";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
+      <LandingImplicitAuthBridge />
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
           <Link href="/" className="outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-zinc-400">
